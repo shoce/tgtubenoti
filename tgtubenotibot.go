@@ -338,7 +338,6 @@ func init() {
 		tglog("ERROR time.LoadLocation %s", err)
 		os.Exit(1)
 	}
-	tglog("TzMoscow: %v", TzMoscow)
 
 	if os.Getenv("YamlConfigPath") != "" {
 		YamlConfigPath = os.Getenv("YamlConfigPath")
