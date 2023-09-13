@@ -1,4 +1,4 @@
-FROM golang:1.21.0-bullseye as build
+FROM golang:1.21.1-bullseye as build
 RUN mkdir -p /root/tgtubenotibot/
 COPY tgtubenotibot.go go.mod go.sum /root/tgtubenotibot/
 WORKDIR /root/tgtubenotibot/
