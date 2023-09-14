@@ -987,6 +987,10 @@ func main() {
 		os.Exit(0)
 	}
 
+	YtCheckLastTime = time.Now()
+
+	// published
+
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideos []youtube.PlaylistItemSnippet
 	ytvideos, err = youtubelistpublished()
@@ -1013,7 +1017,7 @@ func main() {
 		}
 	}
 
-	YtCheckLastTime = time.Now()
+	// lives
 
 	var ytvideo *youtube.Video
 	ytvideo, err = youtubesearchlives()
@@ -1069,5 +1073,7 @@ func main() {
 		tglog("SetVar YtCheckLast: %s", err)
 		os.Exit(1)
 	}
+
+	tglog("YtCheckLast=%s", YtCheckLast)
 
 }
