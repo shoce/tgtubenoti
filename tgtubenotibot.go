@@ -989,6 +989,15 @@ func main() {
 
 	YtCheckLastTime = time.Now()
 
+	YtCheckLast = YtCheckLastTime.UTC().Format(time.RFC3339)
+	err = SetVar("YtCheckLast", YtCheckLast)
+	if err != nil {
+		tglog("SetVar YtCheckLast: %s", err)
+		os.Exit(1)
+	}
+
+	tglog("YtCheckLast=%s", YtCheckLast)
+
 	// published
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
@@ -1066,14 +1075,5 @@ func main() {
 		tglog("telegram post next live: %s", err)
 		os.Exit(1)
 	}
-
-	YtCheckLast = YtCheckLastTime.UTC().Format(time.RFC3339)
-	err = SetVar("YtCheckLast", YtCheckLast)
-	if err != nil {
-		tglog("SetVar YtCheckLast: %s", err)
-		os.Exit(1)
-	}
-
-	tglog("YtCheckLast=%s", YtCheckLast)
 
 }
