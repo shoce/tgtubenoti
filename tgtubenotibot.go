@@ -979,10 +979,12 @@ func main() {
 
 	if time.Now().Sub(YtCheckLastTime) < YtCheckIntervalDuration {
 		if DEBUG {
-			tglog(
-				"next youtube check in %v",
-				YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second),
-			)
+			/*
+				tglog(
+					"next youtube check in %v",
+					YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second),
+				)
+			*/
 		}
 		os.Exit(0)
 	}
