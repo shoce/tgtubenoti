@@ -709,7 +709,7 @@ func tgSendMessage(chatid, text string) (msg *TgMessage, err error) {
 	return msg, nil
 }
 
-func youtubegetplaylistid() (err error) {
+func ytgetplaylistid() (err error) {
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#ChannelsListCall
 
 	channelslistcall := YtSvc.Channels.List([]string{"id", "snippet", "contentDetails"}).MaxResults(6)
@@ -743,10 +743,11 @@ func youtubegetplaylistid() (err error) {
 	return nil
 }
 
-func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistItemSnippet, err error) {
+func ytlistpublished(publishedafter string) (ytvideosids []string, err error) {
 	// https://developers.google.com/youtube/v3/docs/playlistItems/list
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemsListCall
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
+	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItem
 
 	playlistitemslistcall := YtSvc.PlaylistItems.List([]string{"snippet", "contentDetails"}).MaxResults(YtMaxResults)
 	playlistitemslistcall = playlistitemslistcall.PlaylistId(YtPlaylistId)
@@ -755,7 +756,7 @@ func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistI
 		func(r *youtube.PlaylistItemListResponse) error {
 			for _, i := range r.Items {
 				if i.Snippet.PublishedAt > publishedafter {
-					ytsnippets = append(ytsnippets, *i.Snippet)
+					ytvideosids = append(ytvideosids, (*i).Snippet.ResourceId.VideoId)
 				}
 			}
 			return nil
@@ -765,21 +766,16 @@ func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistI
 		return nil, fmt.Errorf("youtube playlistitems list: %v", err)
 	}
 
-	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItem
-	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
-
-	sort.Slice(ytsnippets, func(i, j int) bool { return ytsnippets[i].PublishedAt < ytsnippets[j].PublishedAt })
-
-	return ytsnippets, nil
+	return ytvideosids, nil
 }
 
-func youtubesearchlives() (ytvideo *youtube.Video, err error) {
+func ytsearchlives() (ytvideosids []string, err error) {
 	// https://developers.google.com/youtube/v3/docs/search/list
 
 	// https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas
 	// one search call costs 100 quota
 
-	searchcall := YtSvc.Search.List([]string{"id", "snippet"}).MaxResults(1).Order("date").Type("video")
+	searchcall := YtSvc.Search.List([]string{"id", "snippet"}).MaxResults(6).Order("date").Type("video")
 	searchcall = searchcall.ChannelId(YtChannelId).EventType(YtEventType)
 	searchcall = searchcall.PublishedAfter(YtNextLivePublishedAtTime.Add(time.Second).Format(time.RFC3339))
 	rs, err := searchcall.Do()
@@ -795,18 +791,20 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 		}
 	}
 
-	if len(rs.Items) == 0 {
-		return nil, nil
+	for _, i := range rs.Items {
+		ytvideosids = append(ytvideosids, i.Id.VideoId)
 	}
 
-	vid := rs.Items[0].Id.VideoId
+	return ytvideosids, nil
+}
 
+func ytvideoslist(ytvideosids []string) (ytvideos []youtube.Video, err error) {
 	// https://developers.google.com/youtube/v3/docs/videos/list
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#VideoListResponse
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#Video
 
 	v := YtSvc.Videos.List([]string{"snippet", "liveStreamingDetails"})
-	v = v.Id(vid)
+	v = v.Id(ytvideosids...)
 	rv, err := v.Do()
 	if err != nil {
 		return nil, fmt.Errorf("videos list: %w", err)
@@ -814,34 +812,67 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 	if DEBUG {
 		log("DEBUG videos.list response: %+v", rv)
 	}
-	if len(rv.Items) == 0 {
-		return nil, fmt.Errorf("video %s not found", vid)
+
+	for _, v := range rv.Items {
+		ytvideos = append(ytvideos, *v)
 	}
 
-	ytvideo = rv.Items[0]
+	sort.Slice(ytvideos, func(i, j int) bool { return ytvideos[i].Snippet.PublishedAt < ytvideos[j].Snippet.PublishedAt })
 
-	return ytvideo, nil
+	return ytvideos, nil
 }
 
-func ytvideoPhotoUrl(ytthumbs *youtube.ThumbnailDetails) (photourl string) {
-	if ytthumbs != nil {
-		switch {
-		case ytthumbs.Maxres != nil && ytthumbs.Maxres.Url != "":
-			photourl = ytthumbs.Maxres.Url
-		case ytthumbs.Standard != nil && ytthumbs.Standard.Url != "":
-			photourl = ytthumbs.Standard.Url
-		case ytthumbs.High != nil && ytthumbs.High.Url != "":
-			photourl = ytthumbs.High.Url
-		case ytthumbs.Medium != nil && ytthumbs.Medium.Url != "":
-			photourl = ytthumbs.Medium.Url
-		case ytthumbs.Default != nil && ytthumbs.Default.Url != "":
-			photourl = ytthumbs.Default.Url
-		}
+func ytvideoPhotoUrl(ytthumbs youtube.ThumbnailDetails) (photourl string) {
+	switch {
+	case ytthumbs.Maxres != nil && ytthumbs.Maxres.Url != "":
+		photourl = ytthumbs.Maxres.Url
+	case ytthumbs.Standard != nil && ytthumbs.Standard.Url != "":
+		photourl = ytthumbs.Standard.Url
+	case ytthumbs.High != nil && ytthumbs.High.Url != "":
+		photourl = ytthumbs.High.Url
+	case ytthumbs.Medium != nil && ytthumbs.Medium.Url != "":
+		photourl = ytthumbs.Medium.Url
+	case ytthumbs.Default != nil && ytthumbs.Default.Url != "":
+		photourl = ytthumbs.Default.Url
 	}
 	return photourl
 }
 
-func tgpostnextlive(ytvideo *youtube.Video) error {
+func tgpostpublished(ytvideo youtube.Video) error {
+	var err error
+
+	var photourl string
+	if ytvideo.Snippet.Thumbnails != nil {
+		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
+	}
+
+	if DEBUG {
+		log("photourl: %s"+NL, photourl)
+	}
+
+	caption := fmt.Sprintf(
+		"Новое видео "+NL+
+			"*%s* "+NL+
+			"https://youtu.be/%s "+NL,
+		tgEscape(ytvideo.Snippet.Title),
+		tgEscape(ytvideo.Id),
+	)
+
+	if DEBUG {
+		log("tgpostpublished photo caption: "+NL+"%s"+NL, caption)
+	}
+
+	msg, err := tgSendPhoto(TgChatId, photourl, caption)
+	if err != nil {
+		return fmt.Errorf("telegram send photo: %w", err)
+	}
+
+	log("posted telegram photo message id:%s"+NL, msg.Id)
+
+	return nil
+}
+
+func tgpostnextlive(ytvideo youtube.Video) error {
 	var err error
 
 	if YtNextLive != "" {
@@ -851,7 +882,10 @@ func tgpostnextlive(ytvideo *youtube.Video) error {
 		}
 	}
 
-	photourl := ytvideoPhotoUrl(ytvideo.Snippet.Thumbnails)
+	var photourl string
+	if ytvideo.Snippet.Thumbnails != nil {
+		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
+	}
 
 	if DEBUG {
 		log("tgpostnextlive photourl: %s"+NL, photourl)
@@ -908,37 +942,6 @@ func tgpostlivereminder() error {
 	return nil
 }
 
-func tgpostpublished(ytsnippet *youtube.PlaylistItemSnippet) error {
-	var err error
-
-	photourl := ytvideoPhotoUrl(ytsnippet.Thumbnails)
-
-	if DEBUG {
-		log("photourl: %s"+NL, photourl)
-	}
-
-	caption := fmt.Sprintf(
-		"Новое видео "+NL+
-			"*%s* "+NL+
-			"https://youtu.be/%s "+NL,
-		tgEscape(ytsnippet.Title),
-		tgEscape(ytsnippet.ResourceId.VideoId),
-	)
-
-	if DEBUG {
-		log("tgpostpublished photo caption: "+NL+"%s"+NL, caption)
-	}
-
-	msg, err := tgSendPhoto(TgChatId, photourl, caption)
-	if err != nil {
-		return fmt.Errorf("telegram send photo: %w", err)
-	}
-
-	log("posted telegram photo message id:%s"+NL, msg.Id)
-
-	return nil
-}
-
 func main() {
 	var err error
 
@@ -969,25 +972,34 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = youtubegetplaylistid()
+	err = ytgetplaylistid()
 	if err != nil {
 		tglog("ERROR get youtube playlist id: %w", err)
 		os.Exit(1)
 	}
 
-	// published in recent ten hours
+	// videos published in recent ten hours
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
-	var ytvideos1 []youtube.PlaylistItemSnippet
-	ytvideos1, err = youtubelistpublished(time.Now().Add(-10 * time.Hour).UTC().Format(time.RFC3339))
+	var ytvideosids1 []string
+	ytvideosids1, err = ytlistpublished(time.Now().Add(-10 * time.Hour).UTC().Format(time.RFC3339))
+	if err != nil {
+		tglog("WARNING youtube list published in recent ten hours: %s", err)
+	}
+
+	var ytvideos1 []youtube.Video
+	ytvideos1, err = ytvideoslist(ytvideosids1)
 	if err != nil {
 		tglog("WARNING youtube list published in recent ten hours: %s", err)
 	}
 
 	if DEBUG {
 		tglog("DEBUG published videos in recent ten hours : %d items: ", len(ytvideos1))
-		for i, snippet := range ytvideos1 {
-			tglog("DEBUG %03d/%03d id:%s title:`%s` snippet:%#v ", i+1, len(ytvideos1), snippet.ResourceId.VideoId, snippet.Title, snippet)
+		for i, v := range ytvideos1 {
+			tglog(
+				"DEBUG %03d/%03d id:%s title:`%s` LiveStreamingDetails:%#v ",
+				i+1, len(ytvideos1), v.Id, v.Snippet.Title, v.LiveStreamingDetails,
+			)
 		}
 	}
 
@@ -1011,29 +1023,35 @@ func main() {
 		os.Exit(1)
 	}
 
-	// published
+	// videos published
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
-	var ytvideos []youtube.PlaylistItemSnippet
-	ytvideos, err = youtubelistpublished(YtLastPublishedAt)
+	var ytvideosids []string
+	ytvideosids, err = ytlistpublished(YtLastPublishedAt)
+	if err != nil {
+		tglog("WARNING youtube list published: %s", err)
+	}
+
+	var ytvideos []youtube.Video
+	ytvideos, err = ytvideoslist(ytvideosids)
 	if err != nil {
 		tglog("WARNING youtube list published: %s", err)
 	}
 
 	if DEBUG {
 		tglog("DEBUG published videos: %d items ", len(ytvideos))
-		for i, snippet := range ytvideos {
-			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos), snippet.ResourceId.VideoId, snippet.Title)
+		for i, v := range ytvideos {
+			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos), v.Id, v.Snippet.Title)
 		}
 	}
 
-	for _, ytvideo := range ytvideos {
-		err = tgpostpublished(&ytvideo)
+	for _, v := range ytvideos {
+		err = tgpostpublished(v)
 		if err != nil {
 			tglog("ERROR telegram post published youtube video: %s", err)
 			os.Exit(1)
 		}
-		YtLastPublishedAt = ytvideo.PublishedAt
+		YtLastPublishedAt = v.Snippet.PublishedAt
 		err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
 		if err != nil {
 			tglog("WARNING SetVar YtLastPublishedAt: %s", err)
@@ -1042,39 +1060,54 @@ func main() {
 
 	// lives
 
-	var ytvideo *youtube.Video
-	ytvideo, err = youtubesearchlives()
+	var ytlivesids []string
+	ytlivesids, err = ytsearchlives()
 	if err != nil {
 		tglog("ERROR youtube search lives: %s", err)
 		os.Exit(1)
 	}
 
-	if ytvideo == nil {
+	if len(ytlivesids) == 0 {
 		os.Exit(0)
 	}
 
-	YtNextLive = ytvideo.LiveStreamingDetails.ScheduledStartTime
+	var ytlives []youtube.Video
+	ytlives, err = ytvideoslist(ytvideosids)
+	if err != nil {
+		tglog("WARNING youtube list lives: %s", err)
+	}
+
+	if DEBUG {
+		tglog("DEBUG lives: %d items: ", len(ytlives))
+		for i, v := range ytlives {
+			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytlives), v.Id, v.Snippet.Title)
+		}
+	}
+
+	nextlivevideo := ytlives[0]
+
+	YtNextLive = nextlivevideo.LiveStreamingDetails.ScheduledStartTime
 	err = SetVar("YtNextLive", YtNextLive)
 	if err != nil {
 		tglog("ERROR SetVar YtNextLive: %s", err)
 		os.Exit(1)
 	}
 
-	YtNextLivePublishedAt = ytvideo.Snippet.PublishedAt
+	YtNextLivePublishedAt = nextlivevideo.Snippet.PublishedAt
 	err = SetVar("YtNextLivePublishedAt", YtNextLivePublishedAt)
 	if err != nil {
 		tglog("ERROR SetVar YtNextLivePublishedAt: %s", err)
 		os.Exit(1)
 	}
 
-	YtNextLiveId = ytvideo.Id
+	YtNextLiveId = nextlivevideo.Id
 	err = SetVar("YtNextLiveId", YtNextLiveId)
 	if err != nil {
 		tglog("ERROR SetVar YtNextLiveId: %s", err)
 		os.Exit(1)
 	}
 
-	YtNextLiveTitle = ytvideo.Snippet.Title
+	YtNextLiveTitle = nextlivevideo.Snippet.Title
 	err = SetVar("YtNextLiveTitle", YtNextLiveTitle)
 	if err != nil {
 		tglog("ERROR SetVar YtNextLiveTitle: %s", err)
@@ -1088,7 +1121,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = tgpostnextlive(ytvideo)
+	err = tgpostnextlive(nextlivevideo)
 	if err != nil {
 		tglog("telegram post next live: %s", err)
 		os.Exit(1)
