@@ -964,6 +964,26 @@ func main() {
 		}
 	}
 
+	// wait for YtCheckIntervalDuration
+
+	if time.Now().Sub(YtCheckLastTime) < YtCheckIntervalDuration {
+		if DEBUG {
+			log("next youtube check in %v", YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second))
+		}
+		os.Exit(0)
+	}
+
+	// update YtCheckLastTime
+
+	YtCheckLastTime = time.Now()
+
+	YtCheckLast = YtCheckLastTime.UTC().Format(time.RFC3339)
+	err = SetVar("YtCheckLast", YtCheckLast)
+	if err != nil {
+		tglog("ERROR SetVar YtCheckLast: %s", err)
+		os.Exit(1)
+	}
+
 	// youtube service
 
 	YtSvc, err = youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(YtKey))
@@ -1005,26 +1025,6 @@ func main() {
 				v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
 			)
 		}
-	}
-
-	// wait for YtCheckIntervalDuration
-
-	if time.Now().Sub(YtCheckLastTime) < YtCheckIntervalDuration {
-		if DEBUG {
-			log("next youtube check in %v", YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second))
-		}
-		os.Exit(0)
-	}
-
-	// update YtCheckLastTime
-
-	YtCheckLastTime = time.Now()
-
-	YtCheckLast = YtCheckLastTime.UTC().Format(time.RFC3339)
-	err = SetVar("YtCheckLast", YtCheckLast)
-	if err != nil {
-		tglog("ERROR SetVar YtCheckLast: %s", err)
-		os.Exit(1)
 	}
 
 	// videos published
