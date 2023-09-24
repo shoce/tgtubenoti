@@ -1014,14 +1014,21 @@ func main() {
 	if DEBUG {
 		tglog("DEBUG videos published in recent ten hours : %d items: ", len(ytvideos1))
 		for i, v := range ytvideos1 {
-			tglog(
-				"DEBUG %03d/%03d %s id:%s "+
-					"PublishedAt:%s ScheduledStartTime:%s "+
-					"ActualStartTime:%s ActualEndTime:%s",
-				i+1, len(ytvideos1), v.Snippet.Title, v.Id,
-				v.Snippet.PublishedAt, v.LiveStreamingDetails.ScheduledStartTime,
-				v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
-			)
+			if v.LiveStreamingDetails != nil {
+				tglog(
+					"DEBUG %03d/%03d %s id:%s "+
+						"PublishedAt:%s ScheduledStartTime:%s "+
+						"ActualStartTime:%s ActualEndTime:%s ",
+					i+1, len(ytvideos1), v.Snippet.Title, v.Id,
+					v.Snippet.PublishedAt, v.LiveStreamingDetails.ScheduledStartTime,
+					v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
+				)
+			} else {
+				tglog(
+					"DEBUG %03d/%03d %s id:%s PublishedAt:%s LiveStreamingDetails:nil ",
+					i+1, len(ytvideos1), v.Snippet.Title, v.Id, v.Snippet.PublishedAt,
+				)
+			}
 		}
 	}
 
