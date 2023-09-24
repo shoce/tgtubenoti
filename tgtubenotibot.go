@@ -77,6 +77,9 @@ var (
 
 	TzMoscow   *time.Location
 	HttpClient = &http.Client{}
+
+	YtSvc        *youtube.Service
+	YtPlaylistId string
 )
 
 func log(msg string, args ...interface{}) {
@@ -707,17 +710,12 @@ func tgSendMessage(chatid, text string) (msg *TgMessage, err error) {
 }
 
 func youtubesearchlives() (ytvideo *youtube.Video, err error) {
-	ytsvc, err := youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(YtKey))
-	if err != nil {
-		return nil, fmt.Errorf("NewService: %w", err)
-	}
-
 	// https://developers.google.com/youtube/v3/docs/search/list
 
 	// https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas
 	// one search call costs 100 quota
 
-	searchcall := ytsvc.Search.List([]string{"id", "snippet"}).MaxResults(1).Order("date").Type("video")
+	searchcall := YtSvc.Search.List([]string{"id", "snippet"}).MaxResults(1).Order("date").Type("video")
 	searchcall = searchcall.ChannelId(YtChannelId).EventType(YtEventType)
 	searchcall = searchcall.PublishedAfter(YtNextLivePublishedAtTime.Add(time.Second).Format(time.RFC3339))
 	rs, err := searchcall.Do()
@@ -743,7 +741,7 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#VideoListResponse
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#Video
 
-	v := ytsvc.Videos.List([]string{"snippet", "liveStreamingDetails"})
+	v := YtSvc.Videos.List([]string{"snippet", "liveStreamingDetails"})
 	v = v.Id(vid)
 	rv, err := v.Do()
 	if err != nil {
@@ -761,15 +759,10 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 	return ytvideo, nil
 }
 
-func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistItemSnippet, err error) {
-	ytsvc, err := youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(YtKey))
-	if err != nil {
-		return nil, fmt.Errorf("NewService: %w", err)
-	}
-
+func youtubegetplaylistid() (err error) {
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#ChannelsListCall
 
-	channelslistcall := ytsvc.Channels.List([]string{"id", "snippet", "contentDetails"}).MaxResults(6)
+	channelslistcall := YtSvc.Channels.List([]string{"id", "snippet", "contentDetails"}).MaxResults(6)
 	if YtChannelId != "" {
 		channelslistcall = channelslistcall.Id(YtChannelId)
 	} else if YtUsername != "" {
@@ -777,11 +770,11 @@ func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistI
 	}
 	channelslist, err := channelslistcall.Do()
 	if err != nil {
-		return nil, fmt.Errorf("youtube channels list: %w", err)
+		return fmt.Errorf("youtube channels list: %w", err)
 	}
 
 	if len(channelslist.Items) == 0 {
-		return nil, fmt.Errorf("youtube channels list: empty result")
+		return fmt.Errorf("youtube channels list: empty result")
 	}
 	if DEBUG {
 		for _, c := range channelslist.Items {
@@ -792,15 +785,20 @@ func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistI
 		}
 	}
 	if len(channelslist.Items) > 1 {
-		return nil, fmt.Errorf("channels list: more than one result")
+		return fmt.Errorf("channels list: more than one result")
 	}
-	YtPlaylistId := channelslist.Items[0].ContentDetails.RelatedPlaylists.Uploads
 
+	YtPlaylistId = channelslist.Items[0].ContentDetails.RelatedPlaylists.Uploads
+
+	return nil
+}
+
+func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistItemSnippet, err error) {
 	// https://developers.google.com/youtube/v3/docs/playlistItems/list
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemsListCall
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 
-	playlistitemslistcall := ytsvc.PlaylistItems.List([]string{"snippet", "contentDetails"}).MaxResults(YtMaxResults)
+	playlistitemslistcall := YtSvc.PlaylistItems.List([]string{"snippet", "contentDetails"}).MaxResults(YtMaxResults)
 	playlistitemslistcall = playlistitemslistcall.PlaylistId(YtPlaylistId)
 	err = playlistitemslistcall.Pages(
 		context.TODO(),
@@ -970,12 +968,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	YtCheckLastTime = time.Now()
-
-	YtCheckLast = YtCheckLastTime.UTC().Format(time.RFC3339)
-	err = SetVar("YtCheckLast", YtCheckLast)
+	YtSvc, err = youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(YtKey))
 	if err != nil {
-		tglog("ERROR SetVar YtCheckLast: %s", err)
+		tglog("ERROR youtube.NewService: %w", err)
 		os.Exit(1)
 	}
 
@@ -993,6 +988,17 @@ func main() {
 		for i, snippet := range ytvideos1 {
 			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos1), snippet.ResourceId.VideoId, snippet.Title)
 		}
+	}
+
+	// update YtCheckLastTime
+
+	YtCheckLastTime = time.Now()
+
+	YtCheckLast = YtCheckLastTime.UTC().Format(time.RFC3339)
+	err = SetVar("YtCheckLast", YtCheckLast)
+	if err != nil {
+		tglog("ERROR SetVar YtCheckLast: %s", err)
+		os.Exit(1)
 	}
 
 	// published
