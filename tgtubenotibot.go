@@ -726,22 +726,15 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 	}
 
 	if DEBUG {
-		log("response: %+v", rs)
-		log("search.list: (%d items)", len(rs.Items))
+		log("search.list %s lives response: %+v", YtEventType, rs)
+		tglog("search.list: %d items: ", len(rs.Items))
 		for i, item := range rs.Items {
-			log("n:%03d id:%s title:`%s`", i+1, item.Id.VideoId, item.Snippet.Title)
+			tglog("%03d/%03d id:%s title:`%s`", i+1, len(rs.Items), item.Id.VideoId, item.Snippet.Title)
 		}
 	}
 
 	if len(rs.Items) == 0 {
-		if DEBUG {
-			log("no %s live videos found", YtEventType)
-		}
 		return nil, nil
-	}
-
-	if DEBUG {
-		log("videos.list:")
 	}
 
 	vid := rs.Items[0].Id.VideoId
@@ -757,7 +750,7 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 		return nil, fmt.Errorf("videos list: %w", err)
 	}
 	if DEBUG {
-		log("response: %+v", rv)
+		log("videos.list response: %+v", rv)
 	}
 	if len(rv.Items) == 0 {
 		return nil, fmt.Errorf("video %s not found", vid)
@@ -793,11 +786,11 @@ func youtubelistpublished() (ytsnippets []youtube.PlaylistItemSnippet, err error
 	if DEBUG {
 		for _, c := range channelslist.Items {
 			tglog(
-				"channel id: %s"+NL+
-					"channel title: %s"+NL+
+				"channel title: %s"+NL+
+					"channel id: %s"+NL+
 					"uploads playlist id: %+v"+NL,
-				c.Id,
 				c.Snippet.Title,
+				c.Id,
 				c.ContentDetails.RelatedPlaylists.Uploads,
 			)
 		}
@@ -832,13 +825,6 @@ func youtubelistpublished() (ytsnippets []youtube.PlaylistItemSnippet, err error
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 
 	sort.Slice(ytsnippets, func(i, j int) bool { return ytsnippets[i].PublishedAt < ytsnippets[j].PublishedAt })
-
-	if DEBUG {
-		log("playlistitems.list: (%d items)", len(ytsnippets))
-		for i, snippet := range ytsnippets {
-			log("n:%03d id:%s title:`%s`", i+1, snippet.ResourceId.VideoId, snippet.Title)
-		}
-	}
 
 	return ytsnippets, nil
 }
@@ -962,7 +948,11 @@ func tgpostpublished(ytsnippet *youtube.PlaylistItemSnippet) error {
 func main() {
 	var err error
 
-	if tonextlive := YtNextLiveTime.Sub(time.Now()); tonextlive > 55*time.Minute && tonextlive < 65*time.Minute {
+	if YtNextLiveReminderSent != "true" && time.Now().Before(YtNextLiveTime) {
+		tglog("next live %s `%s` in %s", YtNextLiveId, YtNextLiveTitle, YtNextLiveTime.Sub(time.Now()).Truncate(time.Minute))
+	}
+
+	if tonextlive := YtNextLiveTime.Sub(time.Now()); tonextlive > 58*time.Minute && tonextlive < 62*time.Minute {
 		if YtNextLiveReminderSent != "true" {
 			err = tgpostlivereminder()
 			if err != nil {
@@ -979,12 +969,7 @@ func main() {
 
 	if time.Now().Sub(YtCheckLastTime) < YtCheckIntervalDuration {
 		if DEBUG {
-			/*
-				tglog(
-					"next youtube check in %v",
-					YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second),
-				)
-			*/
+			log("next youtube check in %v", YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second))
 		}
 		os.Exit(0)
 	}
@@ -998,7 +983,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	tglog("YtCheckLast=%s", YtCheckLast)
+	log("YtCheckLast: %s", YtCheckLast)
 
 	// published
 
@@ -1009,9 +994,10 @@ func main() {
 		tglog("WARNING youtube list published: %s", err)
 	}
 
-	if len(ytvideos) == 0 {
-		if DEBUG {
-			tglog("no new published videos")
+	if DEBUG {
+		log("published videos: %d items ", len(ytvideos))
+		for i, snippet := range ytvideos {
+			log("%03d/%03d id:%s title:`%s`", i+1, len(ytvideos), snippet.ResourceId.VideoId, snippet.Title)
 		}
 	}
 
