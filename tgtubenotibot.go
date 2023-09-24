@@ -709,22 +709,22 @@ func tgSendMessage(chatid, text string) (msg *TgMessage, err error) {
 	return msg, nil
 }
 
-func ytgetplaylistid() (err error) {
+func ytgetplaylistid(ytusername string, ytchannelid string) (playlistid string, err error) {
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#ChannelsListCall
 
 	channelslistcall := YtSvc.Channels.List([]string{"id", "snippet", "contentDetails"}).MaxResults(6)
-	if YtChannelId != "" {
-		channelslistcall = channelslistcall.Id(YtChannelId)
-	} else if YtUsername != "" {
-		channelslistcall = channelslistcall.ForUsername(YtUsername)
+	if ytchannelid != "" {
+		channelslistcall = channelslistcall.Id(ytchannelid)
+	} else if ytusername != "" {
+		channelslistcall = channelslistcall.ForUsername(ytusername)
 	}
 	channelslist, err := channelslistcall.Do()
 	if err != nil {
-		return fmt.Errorf("youtube channels list: %w", err)
+		return "", fmt.Errorf("youtube channels list: %w", err)
 	}
 
 	if len(channelslist.Items) == 0 {
-		return fmt.Errorf("youtube channels list: empty result")
+		return "", fmt.Errorf("youtube channels list: empty result")
 	}
 	if DEBUG {
 		for _, c := range channelslist.Items {
@@ -735,22 +735,22 @@ func ytgetplaylistid() (err error) {
 		}
 	}
 	if len(channelslist.Items) > 1 {
-		return fmt.Errorf("channels list: more than one result")
+		return "", fmt.Errorf("channels list: more than one result")
 	}
 
-	YtPlaylistId = channelslist.Items[0].ContentDetails.RelatedPlaylists.Uploads
+	playlistid = channelslist.Items[0].ContentDetails.RelatedPlaylists.Uploads
 
-	return nil
+	return playlistid, nil
 }
 
-func ytlistpublished(publishedafter string) (ytvideosids []string, err error) {
+func ytplaylistitemslist(ytplaylistid string, publishedafter string) (ytvideosids []string, err error) {
 	// https://developers.google.com/youtube/v3/docs/playlistItems/list
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemsListCall
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItem
 
 	playlistitemslistcall := YtSvc.PlaylistItems.List([]string{"snippet", "contentDetails"}).MaxResults(YtMaxResults)
-	playlistitemslistcall = playlistitemslistcall.PlaylistId(YtPlaylistId)
+	playlistitemslistcall = playlistitemslistcall.PlaylistId(ytplaylistid)
 	err = playlistitemslistcall.Pages(
 		context.TODO(),
 		func(r *youtube.PlaylistItemListResponse) error {
@@ -992,9 +992,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	err = ytgetplaylistid()
+	YtPlaylistId, err = ytgetplaylistid(YtUsername, YtChannelId)
 	if err != nil {
 		tglog("ERROR get youtube playlist id: %w", err)
+		os.Exit(1)
+	}
+	if YtPlaylistId == "" {
+		tglog("ERROR YtPlaylistId empty")
 		os.Exit(1)
 	}
 
@@ -1002,15 +1006,17 @@ func main() {
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideosids1 []string
-	ytvideosids1, err = ytlistpublished(time.Now().Add(-10 * time.Hour).UTC().Format(time.RFC3339))
+	ytvideosids1, err = ytplaylistitemslist(YtPlaylistId, time.Now().Add(-10*time.Hour).UTC().Format(time.RFC3339))
 	if err != nil {
 		tglog("WARNING youtube list published in recent ten hours: %s", err)
 	}
 
 	var ytvideos1 []youtube.Video
-	ytvideos1, err = ytvideoslist(ytvideosids1)
-	if err != nil {
-		tglog("WARNING youtube list published in recent ten hours: %s", err)
+	if len(ytvideosids1) > 0 {
+		ytvideos1, err = ytvideoslist(ytvideosids1)
+		if err != nil {
+			tglog("WARNING youtube list published in recent ten hours: %s", err)
+		}
 	}
 
 	if DEBUG {
@@ -1031,15 +1037,17 @@ func main() {
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideosids []string
-	ytvideosids, err = ytlistpublished(YtLastPublishedAt)
+	ytvideosids, err = ytplaylistitemslist(YtPlaylistId, YtLastPublishedAt)
 	if err != nil {
 		tglog("WARNING youtube list published: %s", err)
 	}
 
 	var ytvideos []youtube.Video
-	ytvideos, err = ytvideoslist(ytvideosids)
-	if err != nil {
-		tglog("WARNING youtube list published: %s", err)
+	if len(ytvideosids) > 0 {
+		ytvideos, err = ytvideoslist(ytvideosids)
+		if err != nil {
+			tglog("WARNING youtube list published: %s", err)
+		}
 	}
 
 	if DEBUG {
