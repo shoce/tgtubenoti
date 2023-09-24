@@ -810,7 +810,7 @@ func ytvideoslist(ytvideosids []string) (ytvideos []youtube.Video, err error) {
 		return nil, fmt.Errorf("videos list: %w", err)
 	}
 	if DEBUG {
-		log("DEBUG videos.list response: %+v", rv)
+		//log("DEBUG videos.list response: %+v", rv)
 	}
 
 	for _, v := range rv.Items {
