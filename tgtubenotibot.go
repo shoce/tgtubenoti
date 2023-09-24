@@ -709,6 +709,40 @@ func tgSendMessage(chatid, text string) (msg *TgMessage, err error) {
 	return msg, nil
 }
 
+func youtubegetplaylistid() (err error) {
+	// https://pkg.go.dev/google.golang.org/api/youtube/v3#ChannelsListCall
+
+	channelslistcall := YtSvc.Channels.List([]string{"id", "snippet", "contentDetails"}).MaxResults(6)
+	if YtChannelId != "" {
+		channelslistcall = channelslistcall.Id(YtChannelId)
+	} else if YtUsername != "" {
+		channelslistcall = channelslistcall.ForUsername(YtUsername)
+	}
+	channelslist, err := channelslistcall.Do()
+	if err != nil {
+		return fmt.Errorf("youtube channels list: %w", err)
+	}
+
+	if len(channelslist.Items) == 0 {
+		return fmt.Errorf("youtube channels list: empty result")
+	}
+	if DEBUG {
+		for _, c := range channelslist.Items {
+			tglog(
+				"channel title: %s / "+"id: %s / "+"playlist id: %s"+NL,
+				c.Snippet.Title, c.Id, c.ContentDetails.RelatedPlaylists.Uploads,
+			)
+		}
+	}
+	if len(channelslist.Items) > 1 {
+		return fmt.Errorf("channels list: more than one result")
+	}
+
+	YtPlaylistId = channelslist.Items[0].ContentDetails.RelatedPlaylists.Uploads
+
+	return nil
+}
+
 func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 	// https://developers.google.com/youtube/v3/docs/search/list
 
@@ -757,40 +791,6 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 	ytvideo = rv.Items[0]
 
 	return ytvideo, nil
-}
-
-func youtubegetplaylistid() (err error) {
-	// https://pkg.go.dev/google.golang.org/api/youtube/v3#ChannelsListCall
-
-	channelslistcall := YtSvc.Channels.List([]string{"id", "snippet", "contentDetails"}).MaxResults(6)
-	if YtChannelId != "" {
-		channelslistcall = channelslistcall.Id(YtChannelId)
-	} else if YtUsername != "" {
-		channelslistcall = channelslistcall.ForUsername(YtUsername)
-	}
-	channelslist, err := channelslistcall.Do()
-	if err != nil {
-		return fmt.Errorf("youtube channels list: %w", err)
-	}
-
-	if len(channelslist.Items) == 0 {
-		return fmt.Errorf("youtube channels list: empty result")
-	}
-	if DEBUG {
-		for _, c := range channelslist.Items {
-			tglog(
-				"channel title: %s / "+"id: %s / "+"playlist id: %s"+NL,
-				c.Snippet.Title, c.Id, c.ContentDetails.RelatedPlaylists.Uploads,
-			)
-		}
-	}
-	if len(channelslist.Items) > 1 {
-		return fmt.Errorf("channels list: more than one result")
-	}
-
-	YtPlaylistId = channelslist.Items[0].ContentDetails.RelatedPlaylists.Uploads
-
-	return nil
 }
 
 func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistItemSnippet, err error) {
@@ -971,6 +971,12 @@ func main() {
 	YtSvc, err = youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(YtKey))
 	if err != nil {
 		tglog("ERROR youtube.NewService: %w", err)
+		os.Exit(1)
+	}
+
+	err = youtubegetplaylistid()
+	if err != nil {
+		tglog("ERROR get youtube playlist id: %w", err)
 		os.Exit(1)
 	}
 
