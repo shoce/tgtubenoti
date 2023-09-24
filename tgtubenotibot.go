@@ -761,7 +761,7 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 	return ytvideo, nil
 }
 
-func youtubelistpublished() (ytsnippets []youtube.PlaylistItemSnippet, err error) {
+func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistItemSnippet, err error) {
 	ytsvc, err := youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(YtKey))
 	if err != nil {
 		return nil, fmt.Errorf("NewService: %w", err)
@@ -769,7 +769,7 @@ func youtubelistpublished() (ytsnippets []youtube.PlaylistItemSnippet, err error
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#ChannelsListCall
 
-	channelslistcall := ytsvc.Channels.List([]string{"id", "snippet", "contentDetails"}).MaxResults(2)
+	channelslistcall := ytsvc.Channels.List([]string{"id", "snippet", "contentDetails"}).MaxResults(6)
 	if YtChannelId != "" {
 		channelslistcall = channelslistcall.Id(YtChannelId)
 	} else if YtUsername != "" {
@@ -786,12 +786,8 @@ func youtubelistpublished() (ytsnippets []youtube.PlaylistItemSnippet, err error
 	if DEBUG {
 		for _, c := range channelslist.Items {
 			tglog(
-				"channel title: %s"+NL+
-					"channel id: %s"+NL+
-					"uploads playlist id: %+v"+NL,
-				c.Snippet.Title,
-				c.Id,
-				c.ContentDetails.RelatedPlaylists.Uploads,
+				"channel title: %s / "+"id: %s / "+"playlist id: %s"+NL,
+				c.Snippet.Title, c.Id, c.ContentDetails.RelatedPlaylists.Uploads,
 			)
 		}
 	}
@@ -810,7 +806,7 @@ func youtubelistpublished() (ytsnippets []youtube.PlaylistItemSnippet, err error
 		context.TODO(),
 		func(r *youtube.PlaylistItemListResponse) error {
 			for _, i := range r.Items {
-				if i.Snippet.PublishedAt > YtLastPublishedAt {
+				if i.Snippet.PublishedAt > publishedafter {
 					ytsnippets = append(ytsnippets, *i.Snippet)
 				}
 			}
@@ -983,11 +979,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	// published in recent ten hours
+
+	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
+	var ytvideos1 []youtube.PlaylistItemSnippet
+	ytvideos1, err = youtubelistpublished(time.Now().Add(-10 * time.Hour).UTC().Format(time.RFC3339))
+	if err != nil {
+		tglog("WARNING youtube list published in recent ten hours: %s", err)
+	}
+
+	if DEBUG {
+		tglog("DEBUG recent ten hours published videos: %d items: ", len(ytvideos1))
+		for i, snippet := range ytvideos1 {
+			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos1), snippet.ResourceId.VideoId, snippet.Title)
+		}
+	}
+
 	// published
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideos []youtube.PlaylistItemSnippet
-	ytvideos, err = youtubelistpublished()
+	ytvideos, err = youtubelistpublished(YtLastPublishedAt)
 	if err != nil {
 		tglog("WARNING youtube list published: %s", err)
 	}
