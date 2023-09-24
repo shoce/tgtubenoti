@@ -726,10 +726,10 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 	}
 
 	if DEBUG {
-		log("search.list %s lives response: %+v", YtEventType, rs)
-		tglog("search.list: %d items: ", len(rs.Items))
+		log("DEBUG search.list %s lives response: %+v", YtEventType, rs)
+		tglog("DEBUG search.list: %d items: ", len(rs.Items))
 		for i, item := range rs.Items {
-			tglog("%03d/%03d id:%s title:`%s`", i+1, len(rs.Items), item.Id.VideoId, item.Snippet.Title)
+			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(rs.Items), item.Id.VideoId, item.Snippet.Title)
 		}
 	}
 
@@ -750,7 +750,7 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 		return nil, fmt.Errorf("videos list: %w", err)
 	}
 	if DEBUG {
-		log("videos.list response: %+v", rv)
+		log("DEBUG videos.list response: %+v", rv)
 	}
 	if len(rv.Items) == 0 {
 		return nil, fmt.Errorf("video %s not found", vid)
@@ -979,11 +979,9 @@ func main() {
 	YtCheckLast = YtCheckLastTime.UTC().Format(time.RFC3339)
 	err = SetVar("YtCheckLast", YtCheckLast)
 	if err != nil {
-		tglog("SetVar YtCheckLast: %s", err)
+		tglog("ERROR SetVar YtCheckLast: %s", err)
 		os.Exit(1)
 	}
-
-	log("YtCheckLast: %s", YtCheckLast)
 
 	// published
 
@@ -995,9 +993,9 @@ func main() {
 	}
 
 	if DEBUG {
-		log("published videos: %d items ", len(ytvideos))
+		tglog("DEBUG published videos: %d items ", len(ytvideos))
 		for i, snippet := range ytvideos {
-			log("%03d/%03d id:%s title:`%s`", i+1, len(ytvideos), snippet.ResourceId.VideoId, snippet.Title)
+			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos), snippet.ResourceId.VideoId, snippet.Title)
 		}
 	}
 
@@ -1024,9 +1022,6 @@ func main() {
 	}
 
 	if ytvideo == nil {
-		if DEBUG {
-			tglog("no %s live events", YtEventType)
-		}
 		os.Exit(0)
 	}
 
