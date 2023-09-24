@@ -1028,28 +1028,35 @@ func main() {
 	YtNextLive = ytvideo.LiveStreamingDetails.ScheduledStartTime
 	err = SetVar("YtNextLive", YtNextLive)
 	if err != nil {
-		tglog("SetVar YtNextLive: %s", err)
+		tglog("ERROR SetVar YtNextLive: %s", err)
 		os.Exit(1)
 	}
 
 	YtNextLivePublishedAt = ytvideo.Snippet.PublishedAt
 	err = SetVar("YtNextLivePublishedAt", YtNextLivePublishedAt)
 	if err != nil {
-		tglog("SetVar YtNextLivePublishedAt: %s", err)
+		tglog("ERROR SetVar YtNextLivePublishedAt: %s", err)
 		os.Exit(1)
 	}
 
 	YtNextLiveId = ytvideo.Id
 	err = SetVar("YtNextLiveId", YtNextLiveId)
 	if err != nil {
-		tglog("SetVar YtNextLiveId: %s", err)
+		tglog("ERROR SetVar YtNextLiveId: %s", err)
 		os.Exit(1)
 	}
 
 	YtNextLiveTitle = ytvideo.Snippet.Title
 	err = SetVar("YtNextLiveTitle", YtNextLiveTitle)
 	if err != nil {
-		tglog("SetVar YtNextLiveTitle: %s", err)
+		tglog("ERROR SetVar YtNextLiveTitle: %s", err)
+		os.Exit(1)
+	}
+
+	YtNextLiveReminderSent = ""
+	err = SetVar("YtNextLiveReminderSent", YtNextLiveReminderSent)
+	if err != nil {
+		tglog("ERROR SetVar YtNextLiveReminderSent: %s", err)
 		os.Exit(1)
 	}
 
