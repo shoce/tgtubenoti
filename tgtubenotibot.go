@@ -783,14 +783,6 @@ func ytsearchlives() (ytvideosids []string, err error) {
 		return nil, fmt.Errorf("search lives: %w", err)
 	}
 
-	if DEBUG {
-		log("DEBUG search.list %s lives response: %+v", YtEventType, rs)
-		tglog("DEBUG search.list: %d items: ", len(rs.Items))
-		for i, item := range rs.Items {
-			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(rs.Items), item.Id.VideoId, item.Snippet.Title)
-		}
-	}
-
 	for _, i := range rs.Items {
 		ytvideosids = append(ytvideosids, i.Id.VideoId)
 	}
@@ -1020,7 +1012,7 @@ func main() {
 	}
 
 	if DEBUG {
-		tglog("DEBUG published videos in recent ten hours : %d items: ", len(ytvideos1))
+		tglog("DEBUG videos published in recent ten hours : %d items: ", len(ytvideos1))
 		for i, v := range ytvideos1 {
 			tglog(
 				"DEBUG %03d/%03d %s id:%s "+
@@ -1051,7 +1043,7 @@ func main() {
 	}
 
 	if DEBUG {
-		tglog("DEBUG published videos: %d items ", len(ytvideos))
+		tglog("DEBUG videos published: %d items: ", len(ytvideos))
 		for i, v := range ytvideos {
 			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos), v.Id, v.Snippet.Title)
 		}
@@ -1079,14 +1071,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if len(ytlivesids) == 0 {
-		os.Exit(0)
-	}
-
 	var ytlives []youtube.Video
-	ytlives, err = ytvideoslist(ytvideosids)
-	if err != nil {
-		tglog("WARNING youtube list lives: %s", err)
+	if len(ytlivesids) > 0 {
+		ytlives, err = ytvideoslist(ytvideosids)
+		if err != nil {
+			tglog("WARNING youtube list lives: %s", err)
+		}
 	}
 
 	if DEBUG {
@@ -1094,6 +1084,10 @@ func main() {
 		for i, v := range ytlives {
 			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytlives), v.Id, v.Snippet.Title)
 		}
+	}
+
+	if len(ytlivesids) == 0 {
+		os.Exit(0)
 	}
 
 	nextlivevideo := ytlives[0]
