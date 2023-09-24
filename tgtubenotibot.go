@@ -680,6 +680,8 @@ func tgSendMessage(chatid, text string) (msg *TgMessage, err error) {
 		"chat_id":    chatid,
 		"text":       text,
 		"parse_mode": "MarkdownV2",
+
+		"disable_web_page_preview": true,
 	}
 	sendmessagejson, err := json.Marshal(sendmessage)
 	if err != nil {
