@@ -203,9 +203,6 @@ func SetVar(name, value string) (err error) {
 func YamlGet(name string) (value string, err error) {
 	configf, err := os.Open(YamlConfigPath)
 	if err != nil {
-		if DEBUG {
-			log("WARNING os.Open config file %s: %v", YamlConfigPath, err)
-		}
 		if os.IsNotExist(err) {
 			return "", nil
 		}
@@ -461,6 +458,7 @@ func init() {
 	}
 	if YtCheckLast != "" {
 		YtCheckLastTime, err = time.Parse(time.RFC3339, YtCheckLast)
+		log("YtCheckLastTime: %v", YtCheckLastTime)
 		if err != nil {
 			log("WARNING YtCheckLast %s", err)
 			log("WARNING YtCheckLast setting to empty")
@@ -479,7 +477,7 @@ func init() {
 	if YtNextLive != "" {
 		YtNextLiveTime, err = time.Parse(time.RFC3339, YtNextLive)
 		if err != nil {
-			log("WARNING YtNextLive %s", err)
+			log("WARNING YtNextLive Parse: %s", err)
 			log("WARNING YtNextLive setting to empty")
 			err = SetVar("YtNextLive", "")
 			if err != nil {
