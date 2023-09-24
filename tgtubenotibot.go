@@ -729,7 +729,7 @@ func youtubegetplaylistid() (err error) {
 	if DEBUG {
 		for _, c := range channelslist.Items {
 			tglog(
-				"channel title: %s / "+"id: %s / "+"playlist id: %s"+NL,
+				"channel title: %s / "+"id: %s / "+"playlist id: %s / ",
 				c.Snippet.Title, c.Id, c.ContentDetails.RelatedPlaylists.Uploads,
 			)
 		}
@@ -741,6 +741,36 @@ func youtubegetplaylistid() (err error) {
 	YtPlaylistId = channelslist.Items[0].ContentDetails.RelatedPlaylists.Uploads
 
 	return nil
+}
+
+func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistItemSnippet, err error) {
+	// https://developers.google.com/youtube/v3/docs/playlistItems/list
+	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemsListCall
+	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
+
+	playlistitemslistcall := YtSvc.PlaylistItems.List([]string{"snippet", "contentDetails"}).MaxResults(YtMaxResults)
+	playlistitemslistcall = playlistitemslistcall.PlaylistId(YtPlaylistId)
+	err = playlistitemslistcall.Pages(
+		context.TODO(),
+		func(r *youtube.PlaylistItemListResponse) error {
+			for _, i := range r.Items {
+				if i.Snippet.PublishedAt > publishedafter {
+					ytsnippets = append(ytsnippets, *i.Snippet)
+				}
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("youtube playlistitems list: %v", err)
+	}
+
+	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItem
+	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
+
+	sort.Slice(ytsnippets, func(i, j int) bool { return ytsnippets[i].PublishedAt < ytsnippets[j].PublishedAt })
+
+	return ytsnippets, nil
 }
 
 func youtubesearchlives() (ytvideo *youtube.Video, err error) {
@@ -791,36 +821,6 @@ func youtubesearchlives() (ytvideo *youtube.Video, err error) {
 	ytvideo = rv.Items[0]
 
 	return ytvideo, nil
-}
-
-func youtubelistpublished(publishedafter string) (ytsnippets []youtube.PlaylistItemSnippet, err error) {
-	// https://developers.google.com/youtube/v3/docs/playlistItems/list
-	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemsListCall
-	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
-
-	playlistitemslistcall := YtSvc.PlaylistItems.List([]string{"snippet", "contentDetails"}).MaxResults(YtMaxResults)
-	playlistitemslistcall = playlistitemslistcall.PlaylistId(YtPlaylistId)
-	err = playlistitemslistcall.Pages(
-		context.TODO(),
-		func(r *youtube.PlaylistItemListResponse) error {
-			for _, i := range r.Items {
-				if i.Snippet.PublishedAt > publishedafter {
-					ytsnippets = append(ytsnippets, *i.Snippet)
-				}
-			}
-			return nil
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("youtube playlistitems list: %v", err)
-	}
-
-	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItem
-	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
-
-	sort.Slice(ytsnippets, func(i, j int) bool { return ytsnippets[i].PublishedAt < ytsnippets[j].PublishedAt })
-
-	return ytsnippets, nil
 }
 
 func ytvideoPhotoUrl(ytthumbs *youtube.ThumbnailDetails) (photourl string) {
@@ -985,9 +985,9 @@ func main() {
 	}
 
 	if DEBUG {
-		tglog("DEBUG recent ten hours published videos: %d items: ", len(ytvideos1))
+		tglog("DEBUG published videos in recent ten hours : %d items: ", len(ytvideos1))
 		for i, snippet := range ytvideos1 {
-			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos1), snippet.ResourceId.VideoId, snippet.Title)
+			tglog("DEBUG %03d/%03d id:%s title:`%s` snippet:%#v ", i+1, len(ytvideos1), snippet.ResourceId.VideoId, snippet.Title, snippet)
 		}
 	}
 
