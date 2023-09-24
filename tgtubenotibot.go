@@ -961,12 +961,7 @@ func main() {
 		}
 	}
 
-	if time.Now().Sub(YtCheckLastTime) < YtCheckIntervalDuration {
-		if DEBUG {
-			log("next youtube check in %v", YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second))
-		}
-		os.Exit(0)
-	}
+	// youtube service
 
 	YtSvc, err = youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(YtKey))
 	if err != nil {
@@ -994,6 +989,15 @@ func main() {
 		for i, snippet := range ytvideos1 {
 			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos1), snippet.ResourceId.VideoId, snippet.Title)
 		}
+	}
+
+	// wait for YtCheckIntervalDuration
+
+	if time.Now().Sub(YtCheckLastTime) < YtCheckIntervalDuration {
+		if DEBUG {
+			log("next youtube check in %v", YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second))
+		}
+		os.Exit(0)
 	}
 
 	// update YtCheckLastTime
