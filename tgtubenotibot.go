@@ -148,7 +148,7 @@ func tglog(msg string, args ...interface{}) error {
 
 func GetVar(name string) (value string, err error) {
 	if DEBUG {
-		log("DEBUG GetVar: %s", name)
+		//log("DEBUG GetVar: %s", name)
 	}
 
 	value = os.Getenv(name)
@@ -997,8 +997,12 @@ func main() {
 		tglog("DEBUG published videos in recent ten hours : %d items: ", len(ytvideos1))
 		for i, v := range ytvideos1 {
 			tglog(
-				"DEBUG %03d/%03d id:%s title:`%s` LiveStreamingDetails:%#v ",
-				i+1, len(ytvideos1), v.Id, v.Snippet.Title, v.LiveStreamingDetails,
+				"DEBUG %03d/%03d %s id:%s "+
+					"PublishedAt:%s ScheduledStartTime:%s "+
+					"ActualStartTime:%s ActualEndTime:%s",
+				i+1, len(ytvideos1), v.Snippet.Title, v.Id,
+				v.Snippet.PublishedAt, v.LiveStreamingDetails.ScheduledStartTime,
+				v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
 			)
 		}
 	}
