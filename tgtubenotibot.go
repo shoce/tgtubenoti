@@ -726,14 +726,6 @@ func ytgetplaylistid(ytusername string, ytchannelid string) (playlistid string, 
 	if len(channelslist.Items) == 0 {
 		return "", fmt.Errorf("youtube channels list: empty result")
 	}
-	if DEBUG {
-		for _, c := range channelslist.Items {
-			tglog(
-				"channel title: %s / "+"id: %s / "+"playlist id: %s / ",
-				c.Snippet.Title, c.Id, c.ContentDetails.RelatedPlaylists.Uploads,
-			)
-		}
-	}
 	if len(channelslist.Items) > 1 {
 		return "", fmt.Errorf("channels list: more than one result")
 	}
@@ -993,40 +985,45 @@ func main() {
 		tglog("ERROR YtPlaylistId empty")
 		os.Exit(1)
 	}
+	/*
+		if DEBUG {
+			tglog("channel id: %s / "+"playlist id: %s / ", YtChannelId, YtPlaylistId)
+		}
+	*/
 
 	// videos published in recent ten hours
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
-	var ytvideosids1 []string
-	ytvideosids1, err = ytplaylistitemslist(YtPlaylistId, time.Now().Add(-10*time.Hour).UTC().Format(time.RFC3339))
+	var ytvideosids10h []string
+	ytvideosids10h, err = ytplaylistitemslist(YtPlaylistId, time.Now().Add(-10*time.Hour).UTC().Format(time.RFC3339))
 	if err != nil {
 		tglog("WARNING youtube list published in recent ten hours: %s", err)
 	}
 
-	var ytvideos1 []youtube.Video
-	if len(ytvideosids1) > 0 {
-		ytvideos1, err = ytvideoslist(ytvideosids1)
+	var ytvideos10h []youtube.Video
+	if len(ytvideosids10h) > 0 {
+		ytvideos10h, err = ytvideoslist(ytvideosids10h)
 		if err != nil {
 			tglog("WARNING youtube list published in recent ten hours: %s", err)
 		}
 	}
 
-	if DEBUG {
-		tglog("DEBUG videos published in recent ten hours : %d items: ", len(ytvideos1))
-		for i, v := range ytvideos1 {
+	if DEBUG && len(ytvideos10h) > 0 {
+		tglog("DEBUG videos published in recent ten hours : %d items: ", len(ytvideos10h))
+		for i, v := range ytvideos10h {
 			if v.LiveStreamingDetails != nil {
 				tglog(
 					"DEBUG %03d/%03d %s id:%s "+
 						"PublishedAt:%s ScheduledStartTime:%s "+
 						"ActualStartTime:%s ActualEndTime:%s ",
-					i+1, len(ytvideos1), v.Snippet.Title, v.Id,
+					i+1, len(ytvideos10h), v.Snippet.Title, v.Id,
 					v.Snippet.PublishedAt, v.LiveStreamingDetails.ScheduledStartTime,
 					v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
 				)
 			} else {
 				tglog(
 					"DEBUG %03d/%03d %s id:%s PublishedAt:%s LiveStreamingDetails:nil ",
-					i+1, len(ytvideos1), v.Snippet.Title, v.Id, v.Snippet.PublishedAt,
+					i+1, len(ytvideos10h), v.Snippet.Title, v.Id, v.Snippet.PublishedAt,
 				)
 			}
 		}
@@ -1049,7 +1046,7 @@ func main() {
 		}
 	}
 
-	if DEBUG {
+	if DEBUG && len(ytvideos) > 0 {
 		tglog("DEBUG videos published: %d items: ", len(ytvideos))
 		for i, v := range ytvideos {
 			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos), v.Id, v.Snippet.Title)
@@ -1086,7 +1083,7 @@ func main() {
 		}
 	}
 
-	if DEBUG {
+	if DEBUG && len(ytlives) > 0 {
 		tglog("DEBUG lives: %d items: ", len(ytlives))
 		for i, v := range ytlives {
 			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytlives), v.Id, v.Snippet.Title)
