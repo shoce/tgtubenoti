@@ -991,39 +991,39 @@ func main() {
 		}
 	*/
 
-	// videos published in recent ten hours
+	// videos published in recent hour
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
-	var ytvideosids10h []string
-	ytvideosids10h, err = ytplaylistitemslist(YtPlaylistId, time.Now().Add(-10*time.Hour).UTC().Format(time.RFC3339))
+	var ytvideosids1h []string
+	ytvideosids1h, err = ytplaylistitemslist(YtPlaylistId, time.Now().Add(-1*time.Hour).UTC().Format(time.RFC3339))
 	if err != nil {
-		tglog("WARNING youtube list published in recent ten hours: %s", err)
+		tglog("WARNING youtube list published in recent hour: %s", err)
 	}
 
-	var ytvideos10h []youtube.Video
-	if len(ytvideosids10h) > 0 {
-		ytvideos10h, err = ytvideoslist(ytvideosids10h)
+	var ytvideos1h []youtube.Video
+	if len(ytvideosids1h) > 0 {
+		ytvideos1h, err = ytvideoslist(ytvideosids1h)
 		if err != nil {
-			tglog("WARNING youtube list published in recent ten hours: %s", err)
+			tglog("WARNING youtube list published in recent hour: %s", err)
 		}
 	}
 
-	if DEBUG && len(ytvideos10h) > 0 {
-		tglog("DEBUG videos published in recent ten hours : %d items: ", len(ytvideos10h))
-		for i, v := range ytvideos10h {
+	if DEBUG && len(ytvideos1h) > 0 {
+		tglog("DEBUG videos published in recent hour : %d items: ", len(ytvideos1h))
+		for i, v := range ytvideos1h {
 			if v.LiveStreamingDetails != nil {
 				tglog(
 					"DEBUG %03d/%03d %s id:%s "+
 						"PublishedAt:%s ScheduledStartTime:%s "+
 						"ActualStartTime:%s ActualEndTime:%s ",
-					i+1, len(ytvideos10h), v.Snippet.Title, v.Id,
+					i+1, len(ytvideos1h), v.Snippet.Title, v.Id,
 					v.Snippet.PublishedAt, v.LiveStreamingDetails.ScheduledStartTime,
 					v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
 				)
 			} else {
 				tglog(
 					"DEBUG %03d/%03d %s id:%s PublishedAt:%s LiveStreamingDetails:nil ",
-					i+1, len(ytvideos10h), v.Snippet.Title, v.Id, v.Snippet.PublishedAt,
+					i+1, len(ytvideos1h), v.Snippet.Title, v.Id, v.Snippet.PublishedAt,
 				)
 			}
 		}
