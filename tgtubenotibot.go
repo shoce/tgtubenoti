@@ -761,6 +761,7 @@ func ytplaylistitemslist(ytplaylistid string, publishedafter string) (ytvideosid
 	return ytvideosids, nil
 }
 
+/*
 func ytsearchlives() (ytvideosids []string, err error) {
 	// https://developers.google.com/youtube/v3/docs/search/list
 
@@ -781,6 +782,7 @@ func ytsearchlives() (ytvideosids []string, err error) {
 
 	return ytvideosids, nil
 }
+*/
 
 func ytvideoslist(ytvideosids []string) (ytvideos []youtube.Video, err error) {
 	// https://developers.google.com/youtube/v3/docs/videos/list
@@ -929,11 +931,13 @@ func tgpostlivereminder() error {
 func main() {
 	var err error
 
-	if YtNextLiveReminderSent != "true" && time.Now().Before(YtNextLiveTime) {
-		tglog("next live %s `%s` in %s", YtNextLiveId, YtNextLiveTitle, YtNextLiveTime.Sub(time.Now()).Truncate(time.Minute))
+	if DEBUG {
+		if YtNextLiveReminderSent != "true" && time.Now().Before(YtNextLiveTime) {
+			tglog("next live %s `%s` in %s", YtNextLiveId, YtNextLiveTitle, YtNextLiveTime.Sub(time.Now()).Truncate(time.Minute))
+		}
 	}
 
-	if tonextlive := YtNextLiveTime.Sub(time.Now()); tonextlive > 58*time.Minute && tonextlive < 62*time.Minute {
+	if tonextlive := YtNextLiveTime.Sub(time.Now()); tonextlive > 57*time.Minute && tonextlive < 61*time.Minute {
 		if YtNextLiveReminderSent != "true" {
 			err = tgpostlivereminder()
 			if err != nil {
@@ -993,43 +997,45 @@ func main() {
 
 	// videos published in recent hour
 
-	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
-	var ytvideosids1h []string
-	ytvideosids1h, err = ytplaylistitemslist(YtPlaylistId, time.Now().Add(-1*time.Hour).UTC().Format(time.RFC3339))
-	if err != nil {
-		tglog("WARNING youtube list published in recent hour: %s", err)
-	}
+	if DEBUG {
 
-	var ytvideos1h []youtube.Video
-	if len(ytvideosids1h) > 0 {
-		ytvideos1h, err = ytvideoslist(ytvideosids1h)
+		// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
+		var ytvideosids1h []string
+		ytvideosids1h, err = ytplaylistitemslist(YtPlaylistId, time.Now().Add(-1*time.Hour).UTC().Format(time.RFC3339))
 		if err != nil {
 			tglog("WARNING youtube list published in recent hour: %s", err)
 		}
-	}
 
-	if DEBUG && len(ytvideos1h) > 0 {
-		tglog("DEBUG videos published in recent hour : %d items: ", len(ytvideos1h))
-		for i, v := range ytvideos1h {
-			if v.LiveStreamingDetails != nil {
-				tglog(
-					"DEBUG %03d/%03d %s id:%s "+
-						"PublishedAt:%s ScheduledStartTime:%s "+
-						"ActualStartTime:%s ActualEndTime:%s ",
-					i+1, len(ytvideos1h), v.Snippet.Title, v.Id,
-					v.Snippet.PublishedAt, v.LiveStreamingDetails.ScheduledStartTime,
-					v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
-				)
-			} else {
-				tglog(
-					"DEBUG %03d/%03d %s id:%s PublishedAt:%s LiveStreamingDetails:nil ",
-					i+1, len(ytvideos1h), v.Snippet.Title, v.Id, v.Snippet.PublishedAt,
-				)
+		var ytvideos1h []youtube.Video
+		if len(ytvideosids1h) > 0 {
+			ytvideos1h, err = ytvideoslist(ytvideosids1h)
+			if err != nil {
+				tglog("WARNING youtube list published in recent hour: %s", err)
 			}
 		}
-	}
 
-	// videos published
+		if len(ytvideos1h) > 0 {
+			tglog("DEBUG videos published in recent hour : %d items: ", len(ytvideos1h))
+			for i, v := range ytvideos1h {
+				if v.LiveStreamingDetails != nil {
+					tglog(
+						"DEBUG %03d/%03d %s id:%s "+
+							"PublishedAt:%s ScheduledStartTime:%s "+
+							"ActualStartTime:%s ActualEndTime:%s ",
+						i+1, len(ytvideos1h), v.Snippet.Title, v.Id,
+						v.Snippet.PublishedAt, v.LiveStreamingDetails.ScheduledStartTime,
+						v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
+					)
+				} else {
+					tglog(
+						"DEBUG %03d/%03d %s id:%s PublishedAt:%s LiveStreamingDetails:nil ",
+						i+1, len(ytvideos1h), v.Snippet.Title, v.Id, v.Snippet.PublishedAt,
+					)
+				}
+			}
+		}
+
+	}
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideosids []string
@@ -1054,87 +1060,68 @@ func main() {
 	}
 
 	for _, v := range ytvideos {
-		err = tgpostpublished(v)
-		if err != nil {
-			tglog("ERROR telegram post published youtube video: %s", err)
-			os.Exit(1)
+
+		if v.LiveStreamingDetails == nil {
+
+			// published
+
+			err = tgpostpublished(v)
+			if err != nil {
+				tglog("ERROR telegram post published youtube video: %s", err)
+				os.Exit(1)
+			}
+			YtLastPublishedAt = v.Snippet.PublishedAt
+			err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
+			if err != nil {
+				tglog("WARNING SetVar YtLastPublishedAt: %s", err)
+			}
+
+		} else {
+
+			// live
+
+			YtNextLive = v.LiveStreamingDetails.ScheduledStartTime
+			err = SetVar("YtNextLive", YtNextLive)
+			if err != nil {
+				tglog("ERROR SetVar YtNextLive: %s", err)
+				os.Exit(1)
+			}
+
+			YtNextLivePublishedAt = v.Snippet.PublishedAt
+			err = SetVar("YtNextLivePublishedAt", YtNextLivePublishedAt)
+			if err != nil {
+				tglog("ERROR SetVar YtNextLivePublishedAt: %s", err)
+				os.Exit(1)
+			}
+
+			YtNextLiveId = v.Id
+			err = SetVar("YtNextLiveId", YtNextLiveId)
+			if err != nil {
+				tglog("ERROR SetVar YtNextLiveId: %s", err)
+				os.Exit(1)
+			}
+
+			YtNextLiveTitle = v.Snippet.Title
+			err = SetVar("YtNextLiveTitle", YtNextLiveTitle)
+			if err != nil {
+				tglog("ERROR SetVar YtNextLiveTitle: %s", err)
+				os.Exit(1)
+			}
+
+			YtNextLiveReminderSent = ""
+			err = SetVar("YtNextLiveReminderSent", YtNextLiveReminderSent)
+			if err != nil {
+				tglog("ERROR SetVar YtNextLiveReminderSent: %s", err)
+				os.Exit(1)
+			}
+
+			err = tgpostnextlive(v)
+			if err != nil {
+				tglog("telegram post next live: %s", err)
+				os.Exit(1)
+			}
 		}
-		YtLastPublishedAt = v.Snippet.PublishedAt
-		err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
-		if err != nil {
-			tglog("WARNING SetVar YtLastPublishedAt: %s", err)
-		}
-	}
 
-	// lives
-
-	var ytlivesids []string
-	ytlivesids, err = ytsearchlives()
-	if err != nil {
-		tglog("ERROR youtube search lives: %s", err)
-		os.Exit(1)
-	}
-
-	var ytlives []youtube.Video
-	if len(ytlivesids) > 0 {
-		ytlives, err = ytvideoslist(ytvideosids)
-		if err != nil {
-			tglog("WARNING youtube list lives: %s", err)
-		}
-	}
-
-	if DEBUG && len(ytlives) > 0 {
-		tglog("DEBUG lives: %d items: ", len(ytlives))
-		for i, v := range ytlives {
-			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytlives), v.Id, v.Snippet.Title)
-		}
-	}
-
-	if len(ytlivesids) == 0 {
-		os.Exit(0)
-	}
-
-	nextlivevideo := ytlives[0]
-
-	YtNextLive = nextlivevideo.LiveStreamingDetails.ScheduledStartTime
-	err = SetVar("YtNextLive", YtNextLive)
-	if err != nil {
-		tglog("ERROR SetVar YtNextLive: %s", err)
-		os.Exit(1)
-	}
-
-	YtNextLivePublishedAt = nextlivevideo.Snippet.PublishedAt
-	err = SetVar("YtNextLivePublishedAt", YtNextLivePublishedAt)
-	if err != nil {
-		tglog("ERROR SetVar YtNextLivePublishedAt: %s", err)
-		os.Exit(1)
-	}
-
-	YtNextLiveId = nextlivevideo.Id
-	err = SetVar("YtNextLiveId", YtNextLiveId)
-	if err != nil {
-		tglog("ERROR SetVar YtNextLiveId: %s", err)
-		os.Exit(1)
-	}
-
-	YtNextLiveTitle = nextlivevideo.Snippet.Title
-	err = SetVar("YtNextLiveTitle", YtNextLiveTitle)
-	if err != nil {
-		tglog("ERROR SetVar YtNextLiveTitle: %s", err)
-		os.Exit(1)
-	}
-
-	YtNextLiveReminderSent = ""
-	err = SetVar("YtNextLiveReminderSent", YtNextLiveReminderSent)
-	if err != nil {
-		tglog("ERROR SetVar YtNextLiveReminderSent: %s", err)
-		os.Exit(1)
-	}
-
-	err = tgpostnextlive(nextlivevideo)
-	if err != nil {
-		tglog("telegram post next live: %s", err)
-		os.Exit(1)
 	}
 
 }
