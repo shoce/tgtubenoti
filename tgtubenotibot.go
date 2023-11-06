@@ -933,7 +933,7 @@ func main() {
 
 	if DEBUG {
 		if YtNextLiveReminderSent != "true" && time.Now().Before(YtNextLiveTime) {
-			tglog("next live %s `%s` in %s", YtNextLiveId, YtNextLiveTitle, YtNextLiveTime.Sub(time.Now()).Truncate(time.Minute))
+			log("next live %s `%s` in %s", YtNextLiveId, YtNextLiveTitle, YtNextLiveTime.Sub(time.Now()).Truncate(time.Minute))
 		}
 	}
 
