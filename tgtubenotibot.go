@@ -1003,14 +1003,14 @@ func main() {
 		var ytvideosids1h []string
 		ytvideosids1h, err = ytplaylistitemslist(YtPlaylistId, time.Now().Add(-1*time.Hour).UTC().Format(time.RFC3339))
 		if err != nil {
-			tglog("WARNING youtube list published in recent hour: %s", err)
+			log("WARNING youtube list published in recent hour: %s", err)
 		}
 
 		var ytvideos1h []youtube.Video
 		if len(ytvideosids1h) > 0 {
 			ytvideos1h, err = ytvideoslist(ytvideosids1h)
 			if err != nil {
-				tglog("WARNING youtube list published in recent hour: %s", err)
+				log("WARNING youtube list published in recent hour: %s", err)
 			}
 		}
 
@@ -1018,7 +1018,7 @@ func main() {
 			tglog("DEBUG videos published in recent hour : %d items: ", len(ytvideos1h))
 			for i, v := range ytvideos1h {
 				if v.LiveStreamingDetails != nil {
-					tglog(
+					log(
 						"DEBUG %03d/%03d %s id:%s "+
 							"PublishedAt:%s ScheduledStartTime:%s "+
 							"ActualStartTime:%s ActualEndTime:%s ",
@@ -1027,7 +1027,7 @@ func main() {
 						v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
 					)
 				} else {
-					tglog(
+					log(
 						"DEBUG %03d/%03d %s id:%s PublishedAt:%s LiveStreamingDetails:nil ",
 						i+1, len(ytvideos1h), v.Snippet.Title, v.Id, v.Snippet.PublishedAt,
 					)
@@ -1061,7 +1061,7 @@ func main() {
 
 	for _, v := range ytvideos {
 
-		if v.LiveStreamingDetails == nil {
+		if v.LiveStreamingDetails == nil || v.LiveStreamingDetails.ActualEndTime != "" {
 
 			// published
 
