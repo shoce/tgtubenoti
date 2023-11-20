@@ -65,13 +65,11 @@ var (
 	YtCheckLast             string
 	YtCheckLastTime         time.Time
 
-	YtNextLive                string
-	YtNextLiveTime            time.Time
-	YtNextLivePublishedAt     string
-	YtNextLivePublishedAtTime time.Time
-	YtNextLiveId              string
-	YtNextLiveTitle           string
-	YtNextLiveReminderSent    string
+	YtNextLive             string
+	YtNextLiveTime         time.Time
+	YtNextLiveId           string
+	YtNextLiveTitle        string
+	YtNextLiveReminderSent string
 
 	YtLastPublishedAt string
 
@@ -489,23 +487,6 @@ func init() {
 		}
 	}
 
-	YtNextLivePublishedAt, err = GetVar("YtNextLivePublishedAt")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-	if YtNextLivePublishedAt != "" {
-		YtNextLivePublishedAtTime, err = time.Parse(time.RFC3339, YtNextLivePublishedAt)
-		if err != nil {
-			log("WARNING YtNextLivePublishedAt %s", err)
-			log("WARNING YtNextLivePublishedAt setting to empty")
-			err = SetVar("YtNextLivePublishedAt", "")
-			if err != nil {
-				tglog("WARNING SetVar YtNextLivePublishedAt: %s", err)
-			}
-		}
-	}
-
 	YtNextLiveId, err = GetVar("YtNextLiveId")
 	if err != nil {
 		log("ERROR %s", err)
@@ -761,29 +742,6 @@ func ytplaylistitemslist(ytplaylistid string, publishedafter string) (ytvideosid
 	return ytvideosids, nil
 }
 
-/*
-func ytsearchlives() (ytvideosids []string, err error) {
-	// https://developers.google.com/youtube/v3/docs/search/list
-
-	// https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas
-	// one search call costs 100 quota
-
-	searchcall := YtSvc.Search.List([]string{"id", "snippet"}).MaxResults(6).Order("date").Type("video")
-	searchcall = searchcall.ChannelId(YtChannelId).EventType(YtEventType)
-	searchcall = searchcall.PublishedAfter(YtNextLivePublishedAtTime.Add(time.Second).Format(time.RFC3339))
-	rs, err := searchcall.Do()
-	if err != nil {
-		return nil, fmt.Errorf("search lives: %w", err)
-	}
-
-	for _, i := range rs.Items {
-		ytvideosids = append(ytvideosids, i.Id.VideoId)
-	}
-
-	return ytvideosids, nil
-}
-*/
-
 func ytvideoslist(ytvideosids []string) (ytvideos []youtube.Video, err error) {
 	// https://developers.google.com/youtube/v3/docs/videos/list
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#VideoListResponse
@@ -995,48 +953,6 @@ func main() {
 		}
 	*/
 
-	// videos published in recent hour
-
-	if DEBUG {
-
-		// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
-		var ytvideosids1h []string
-		ytvideosids1h, err = ytplaylistitemslist(YtPlaylistId, time.Now().Add(-1*time.Hour).UTC().Format(time.RFC3339))
-		if err != nil {
-			log("WARNING youtube list published in recent hour: %s", err)
-		}
-
-		var ytvideos1h []youtube.Video
-		if len(ytvideosids1h) > 0 {
-			ytvideos1h, err = ytvideoslist(ytvideosids1h)
-			if err != nil {
-				log("WARNING youtube list published in recent hour: %s", err)
-			}
-		}
-
-		if len(ytvideos1h) > 0 {
-			tglog("DEBUG videos published in recent hour : %d items: ", len(ytvideos1h))
-			for i, v := range ytvideos1h {
-				if v.LiveStreamingDetails != nil {
-					log(
-						"DEBUG %03d/%03d %s id:%s "+
-							"PublishedAt:%s ScheduledStartTime:%s "+
-							"ActualStartTime:%s ActualEndTime:%s ",
-						i+1, len(ytvideos1h), v.Snippet.Title, v.Id,
-						v.Snippet.PublishedAt, v.LiveStreamingDetails.ScheduledStartTime,
-						v.LiveStreamingDetails.ActualStartTime, v.LiveStreamingDetails.ActualEndTime,
-					)
-				} else {
-					log(
-						"DEBUG %03d/%03d %s id:%s PublishedAt:%s LiveStreamingDetails:nil ",
-						i+1, len(ytvideos1h), v.Snippet.Title, v.Id, v.Snippet.PublishedAt,
-					)
-				}
-			}
-		}
-
-	}
-
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideosids []string
 	ytvideosids, err = ytplaylistitemslist(YtPlaylistId, YtLastPublishedAt)
@@ -1070,11 +986,6 @@ func main() {
 				tglog("ERROR telegram post published youtube video: %s", err)
 				os.Exit(1)
 			}
-			YtLastPublishedAt = v.Snippet.PublishedAt
-			err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
-			if err != nil {
-				tglog("WARNING SetVar YtLastPublishedAt: %s", err)
-			}
 
 		} else {
 
@@ -1084,13 +995,6 @@ func main() {
 			err = SetVar("YtNextLive", YtNextLive)
 			if err != nil {
 				tglog("ERROR SetVar YtNextLive: %s", err)
-				os.Exit(1)
-			}
-
-			YtNextLivePublishedAt = v.Snippet.PublishedAt
-			err = SetVar("YtNextLivePublishedAt", YtNextLivePublishedAt)
-			if err != nil {
-				tglog("ERROR SetVar YtNextLivePublishedAt: %s", err)
 				os.Exit(1)
 			}
 
@@ -1120,6 +1024,12 @@ func main() {
 				tglog("telegram post next live: %s", err)
 				os.Exit(1)
 			}
+		}
+
+		YtLastPublishedAt = v.Snippet.PublishedAt
+		err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
+		if err != nil {
+			tglog("WARNING SetVar YtLastPublishedAt: %s", err)
 		}
 
 	}
