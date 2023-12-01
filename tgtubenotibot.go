@@ -987,6 +987,10 @@ func main() {
 				os.Exit(1)
 			}
 
+		} else if v.LiveStreamingDetails.ActualStartTime != "" && v.LiveStreamingDetails.ActualEndTime == "" {
+
+			// live in progress
+
 		} else {
 
 			// live
