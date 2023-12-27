@@ -972,7 +972,7 @@ func main() {
 			tglog("DEBUG videos published: %d items: ", len(ytvideos))
 			for i, v := range ytvideos {
 				tglog(
-				"DEBUG "+NL+"%03d/%03d id:%s title:`%s` "+NL+"publishedAt:%s "+NL+"liveStreamingDetails:%v ",
+				"DEBUG "+NL+"%03d/%03d id:%s title:`%s` "+NL+"publishedAt:%s "+NL+"liveStreamingDetails:%+v ",
 				i+1,
 				len(ytvideos),
 				v.Id,
