@@ -968,12 +968,20 @@ func main() {
 		}
 	}
 
-	if DEBUG && len(ytvideos) > 0 {
-		tglog("DEBUG videos published: %d items: ", len(ytvideos))
-		for i, v := range ytvideos {
-			tglog("DEBUG %03d/%03d id:%s title:`%s`", i+1, len(ytvideos), v.Id, v.Snippet.Title)
+		if DEBUG && len(ytvideos) > 0 {
+			tglog("DEBUG videos published: %d items: ", len(ytvideos))
+			for i, v := range ytvideos {
+				tglog(
+				"DEBUG "+NL+"%03d/%03d id:%s title:`%s` "+NL+"publishedAt:%s "+NL+"liveStreamingDetails:%v ",
+				i+1,
+				len(ytvideos),
+				v.Id,
+				v.Snippet.Title,
+				v.Snippet.PublishedAt,
+				v.LiveStreamingDetails,
+				)
+			}
 		}
-	}
 
 	for _, v := range ytvideos {
 
