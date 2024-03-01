@@ -988,7 +988,7 @@ func main() {
 		if v.Snippet.PublishedAt <= YtLastPublishedAt {
 
 			// skip
-			tglog("skipping video: %s", v.Id)
+			tglog("skipping video: %s %s<=%s", v.Id, v.Snippet.PublishedAt, YtLastPublishedAt)
 
 		} else if v.LiveStreamingDetails == nil || v.LiveStreamingDetails.ActualEndTime != "" {
 
@@ -998,6 +998,12 @@ func main() {
 			if err != nil {
 				tglog("ERROR telegram post published youtube video: %s", err)
 				os.Exit(1)
+			}
+
+			YtLastPublishedAt = v.Snippet.PublishedAt
+			err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
+			if err != nil {
+				tglog("WARNING SetVar YtLastPublishedAt: %s", err)
 			}
 
 		} else if v.LiveStreamingDetails.ActualStartTime != "" && v.LiveStreamingDetails.ActualEndTime == "" {
@@ -1041,12 +1047,13 @@ func main() {
 				tglog("telegram post next live: %s", err)
 				os.Exit(1)
 			}
-		}
 
-		YtLastPublishedAt = v.Snippet.PublishedAt
-		err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
-		if err != nil {
-			tglog("WARNING SetVar YtLastPublishedAt: %s", err)
+			YtLastPublishedAt = v.Snippet.PublishedAt
+			err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
+			if err != nil {
+				tglog("WARNING SetVar YtLastPublishedAt: %s", err)
+			}
+
 		}
 
 	}
