@@ -968,10 +968,10 @@ func main() {
 		}
 	}
 
-		if DEBUG && len(ytvideos) > 0 {
-			tglog("DEBUG videos published: %d items: ", len(ytvideos))
-			for i, v := range ytvideos {
-				tglog(
+	if DEBUG && len(ytvideos) > 0 {
+		tglog("DEBUG videos published: %d items: ", len(ytvideos))
+		for i, v := range ytvideos {
+			tglog(
 				"DEBUG "+NL+"%03d/%03d id:%s title:`%s` "+NL+"publishedAt:%s "+NL+"liveStreamingDetails:%+v ",
 				i+1,
 				len(ytvideos),
@@ -979,13 +979,18 @@ func main() {
 				v.Snippet.Title,
 				v.Snippet.PublishedAt,
 				v.LiveStreamingDetails,
-				)
-			}
+			)
 		}
+	}
 
 	for _, v := range ytvideos {
 
-		if v.LiveStreamingDetails == nil || v.LiveStreamingDetails.ActualEndTime != "" {
+		if v.Snippet.PublishedAt <= YtLastPublishedAt {
+
+			// skip
+			tglog("skipping video: %s", v.Id)
+
+		} else if v.LiveStreamingDetails == nil || v.LiveStreamingDetails.ActualEndTime != "" {
 
 			// published
 
