@@ -990,6 +990,12 @@ func main() {
 			// skip
 			tglog("skipping video: %s %s<=%s", v.Id, v.Snippet.PublishedAt, YtLastPublishedAt)
 
+			YtLastPublishedAt = v.Snippet.PublishedAt
+			err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
+			if err != nil {
+				tglog("WARNING SetVar YtLastPublishedAt: %s", err)
+			}
+
 		} else if v.LiveStreamingDetails == nil || v.LiveStreamingDetails.ActualEndTime != "" {
 
 			// published
