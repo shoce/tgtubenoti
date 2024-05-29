@@ -371,12 +371,10 @@ func init() {
 		log("WARNING KvNamespaceId empty")
 	}
 
-	VarDEBUG, err := GetVar("DEBUG")
-	if err != nil {
+	if v, err := GetVar("DEBUG"); err != nil {
 		log("ERROR %s", err)
 		os.Exit(1)
-	}
-	if VarDEBUG != "" {
+	} else if v != "" {
 		DEBUG = true
 	}
 
