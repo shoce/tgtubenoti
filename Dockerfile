@@ -5,7 +5,7 @@ RUN mkdir -p /root/tgtubenoti/
 COPY tgtubenoti.go go.mod go.sum /root/tgtubenoti/
 WORKDIR /root/tgtubenoti/
 RUN go version
-RUN go get -a -v
+RUN go get -v
 RUN ls -l -a
 RUN go build -o tgtubenoti tgtubenoti.go
 RUN ls -l -a
