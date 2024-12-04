@@ -1,0 +1,25 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tgtubenoti
+  labels:
+    app: tgtubenoti
+spec:
+  selector:
+    matchLabels:
+      app: tgtubenoti
+  template:
+    metadata:
+      name: tgtubenoti
+      labels:
+        app: tgtubenoti
+    spec:
+      containers:
+        - name: tgtubenoti
+          imagePullPolicy: IfNotPresent
+          image: "{{ $.Values.ImageNameTgTubeNoti }}:{{ $.Values.ImageTagTgTubeNoti }}"
+          envFrom:
+            - configMapRef:
+                name: tgtubenoti
+

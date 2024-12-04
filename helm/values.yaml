@@ -1,0 +1,21 @@
+---
+
+DEBUG: false
+
+YamlConfigPath: tgtubenoti.yaml
+
+KvToken: ""
+KvAccountId: ""
+KvNamespaceId: ""
+
+TgToken: ""
+TgChatId: ""
+
+YtKey: ""
+YtChannelId: ""
+YtPublishedAfter: ""
+
+ImageNameTgTubeNoti: ghcr.io/shoce/tgtubenoti
+ImageTagTgTubeNoti: ""
+
+

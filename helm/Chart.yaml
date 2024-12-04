@@ -1,7 +1,8 @@
 apiVersion: v2
-name: helm.tgtubenotibot
+name: helm.tgtubenoti
 description: Youtube Notifications Telegram Bot
 type: application
 version: __VERSION__
 appVersion: __VERSION__
-home: https://src.iriy.de/tgtubenotibot/helm/index.html
+home: https://github.com/shoce/tgtubenoti/
+
