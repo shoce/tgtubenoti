@@ -15,10 +15,10 @@ RUN ls -l -a
 FROM alpine:3.20.3
 RUN apk add --no-cache tzdata
 RUN apk add --no-cache gcompat && ln -s -f -v ld-linux-x86-64.so.2 /lib/libresolv.so.2
+COPY --from=build /root/tgtubenoti/tgtubenoti /bin/tgtubenoti
+RUN ls -l -a /bin/tgtubenoti
 RUN mkdir -p /opt/tgtubenoti/
-COPY --from=build /root/tgtubenoti/tgtubenoti /opt/tgtubenoti/tgtubenoti
-RUN ls -l -a /opt/tgtubenoti/
 WORKDIR /opt/tgtubenoti/
-ENTRYPOINT ["./tgtubenoti"]
+ENTRYPOINT ["/bin/tgtubenoti"]
 
 
