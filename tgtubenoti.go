@@ -201,6 +201,7 @@ func init() {
 		log("ERROR TgLang `%s` not supported")
 		os.Exit(1)
 	}
+	log("DEBUG TgLang: %s", TgLang)
 
 	TgTimezoneName, err = GetVar("TgTimezoneName")
 	if err != nil {
@@ -216,6 +217,7 @@ func init() {
 		tglog("ERROR time.LoadLocation `%s`: %w", TgTimezoneName, err)
 		os.Exit(1)
 	}
+	log("DEBUG TgTimezoneName: %s", TgTimezoneName)
 
 	TgChatId, err = GetVar("TgChatId")
 	if err != nil {
