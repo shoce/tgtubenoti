@@ -100,7 +100,7 @@ var (
 			"livereminder": "Le live commence dans une heure",
 		},
 		"hindi": map[string]string{
-			"published":    " नया वीडियो",
+			"published":    "नया वीडियो",
 			"nextlive":     "आगामी लाइव",
 			"livereminder": "लाइव एक घंटे में शुरू होगा",
 		},
