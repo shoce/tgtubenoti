@@ -4,9 +4,7 @@ https://console.cloud.google.com/apis/credentials
 https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas
 
 
-go get -u -v
-go mod tidy
-
+GoGet
 GoFmt
 GoBuildNull
 
@@ -76,21 +74,56 @@ var (
 
 	YtLastPublishedAt string
 
-	TzMoscow   *time.Location
 	HttpClient = &http.Client{}
 
 	YtSvc        *youtube.Service
 	YtPlaylistId string
+
+	TgTimezoneName string = "UTC"
+	TgTimezone     *time.Location
+
+	TgLang         string = "english"
+	TgLangMessages        = map[string]map[string]string{
+		"deutsch": map[string]string{
+			"published":    "Neues Video",
+			"nextlive":     "Bevorstehender Livestream",
+			"livereminder": "Der Livestream beginnt in einer Stunde",
+		},
+		"english": map[string]string{
+			"published":    "New video",
+			"nextlive":     "Upcoming live",
+			"livereminder": "Live starts in one hour",
+		},
+		"french": map[string]string{
+			"published":    "Nouveau vidéo",
+			"nextlive":     "Prochain live",
+			"livereminder": "Le live commence dans une heure",
+		},
+		"hindi": map[string]string{
+			"published":    " नया वीडियो",
+			"nextlive":     "आगामी लाइव",
+			"livereminder": "लाइव एक घंटे में शुरू होगा",
+		},
+		"russian": map[string]string{
+			"published":    "Новое видео",
+			"nextlive":     "Запланированный эфир",
+			"livereminder": "Через час начало эфира",
+		},
+		"spanish": map[string]string{
+			"published":    "Nuevo video",
+			"nextlive":     "Próximo en vivo",
+			"livereminder": "El directo comienza en una hora",
+		},
+		"ukrainian": map[string]string{
+			"published":    "Нове відео",
+			"nextlive":     "Запланований ефір",
+			"livereminder": "Через годину початок ефіру",
+		},
+	}
 )
 
 func init() {
 	var err error
-
-	TzMoscow, err = time.LoadLocation("Europe/Moscow")
-	if err != nil {
-		tglog("ERROR time.LoadLocation %s", err)
-		os.Exit(1)
-	}
 
 	if os.Getenv("YamlConfigPath") != "" {
 		YamlConfigPath = os.Getenv("YamlConfigPath")
@@ -147,7 +180,7 @@ func init() {
 
 	TgToken, err = GetVar("TgToken")
 	if err != nil {
-		log("ERROR %s", err)
+		log("ERROR %w", err)
 		os.Exit(1)
 	}
 	if TgToken == "" {
@@ -155,9 +188,38 @@ func init() {
 		os.Exit(1)
 	}
 
+	TgLang, err = GetVar("TgLang")
+	if err != nil {
+		log("ERROR %w", err)
+		os.Exit(1)
+	}
+	if TgLang == "" {
+		log("ERROR TgLang empty")
+		os.Exit(1)
+	}
+	if _, ok := TgLangMessages[TgLang]; !ok {
+		log("ERROR TgLang `%s` not supported")
+		os.Exit(1)
+	}
+
+	TgTimezoneName, err = GetVar("TgTimezoneName")
+	if err != nil {
+		log("ERROR %w", err)
+		os.Exit(1)
+	}
+	if TgTimezoneName == "" {
+		log("ERROR TgTimezoneName empty")
+		os.Exit(1)
+	}
+	TgTimezone, err = time.LoadLocation(TgTimezoneName)
+	if err != nil {
+		tglog("ERROR time.LoadLocation `%s`: %w", TgTimezoneName, err)
+		os.Exit(1)
+	}
+
 	TgChatId, err = GetVar("TgChatId")
 	if err != nil {
-		log("ERROR %s", err)
+		log("ERROR %w", err)
 		os.Exit(1)
 	}
 	if TgChatId == "" {
@@ -167,7 +229,7 @@ func init() {
 
 	TgBossChatId, err = GetVar("TgBossChatId")
 	if err != nil {
-		log("ERROR %s", err)
+		log("ERROR %w", err)
 		os.Exit(1)
 	}
 	if TgBossChatId == "" {
@@ -308,7 +370,7 @@ func main() {
 func CheckTube() (err error) {
 	if DEBUG {
 		if YtNextLiveReminderSent != "true" && time.Now().Before(YtNextLiveTime) {
-			log("next live %s `%s` in %s", YtNextLiveId, YtNextLiveTitle, YtNextLiveTime.Sub(time.Now()).Truncate(time.Minute))
+			log("DEBUG next live %s `%s` in %s", YtNextLiveId, YtNextLiveTitle, YtNextLiveTime.Sub(time.Now()).Truncate(time.Minute))
 		}
 	}
 
@@ -331,7 +393,7 @@ func CheckTube() (err error) {
 
 	if time.Now().Sub(YtCheckLastTime) < YtCheckIntervalDuration {
 		if DEBUG {
-			log("next youtube check in %v", YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second))
+			log("DEBUG next youtube check in %v", YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second))
 		}
 		return nil
 	}
@@ -364,11 +426,10 @@ func CheckTube() (err error) {
 		tglog("ERROR YtPlaylistId empty")
 		return fmt.Errorf("YtPlaylistId empty")
 	}
-	/*
-		if DEBUG {
-			tglog("channel id: %s / "+"playlist id: %s / ", YtChannelId, YtPlaylistId)
-		}
-	*/
+
+	if DEBUG {
+		log("DEBUG channel id: %s / "+"playlist id: %s / ", YtChannelId, YtPlaylistId)
+	}
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideosids []string
@@ -385,8 +446,7 @@ func CheckTube() (err error) {
 		}
 	}
 
-	if DEBUG && len(ytvideos) > 0 {
-		tglog("DEBUG videos published: %d items: ", len(ytvideos))
+	if DEBUG {
 		for i, v := range ytvideos {
 			tglog(
 				"DEBUG "+NL+"%03d/%03d id:%s title:`%s` "+NL+"publishedAt:%s "+NL+"liveStreamingDetails:%+v ",
@@ -618,7 +678,7 @@ func YamlGet(name string) (value string, err error) {
 	configm := make(map[interface{}]interface{})
 	if err = yaml.NewDecoder(configf).Decode(&configm); err != nil {
 		if DEBUG {
-			log("WARNING yaml.Decode %s: %v", YamlConfigPath, err)
+			log("DEBUG yaml.Decode %s: %v", YamlConfigPath, err)
 		}
 		return "", err
 	}
@@ -973,7 +1033,7 @@ func ytvideoslist(ytvideosids []string) (ytvideos []youtube.Video, err error) {
 		return nil, fmt.Errorf("videos list: %w", err)
 	}
 	if DEBUG {
-		//log("DEBUG videos.list response: %+v", rv)
+		log("DEBUG videos.list response: %+v", rv)
 	}
 
 	for _, v := range rv.Items {
@@ -1010,11 +1070,11 @@ func tgpostpublished(ytvideo youtube.Video) error {
 	}
 
 	if DEBUG {
-		log("photourl: %s"+NL, photourl)
+		log("DEBUG photourl: %s"+NL, photourl)
 	}
 
 	caption := fmt.Sprintf(
-		"Новое видео "+NL+
+		TgLangMessages[TgLang]["published"]+" "+NL+
 			"*%s* "+NL+
 			"https://youtu.be/%s "+NL,
 		tgEscape(ytvideo.Snippet.Title),
@@ -1022,7 +1082,7 @@ func tgpostpublished(ytvideo youtube.Video) error {
 	)
 
 	if DEBUG {
-		log("tgpostpublished photo caption: "+NL+"%s"+NL, caption)
+		log("DEBUG tgpostpublished photo caption: "+NL+"%s"+NL, caption)
 	}
 
 	msg, err := tgSendPhoto(TgChatId, photourl, caption)
@@ -1051,23 +1111,24 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 	}
 
 	if DEBUG {
-		log("tgpostnextlive photourl: %s"+NL, photourl)
+		log("DEBUG tgpostnextlive photourl: %s"+NL, photourl)
 	}
 
 	caption := fmt.Sprintf(
-		"Запланированный эфир "+NL+
+		TgLangMessages[TgLang]["nextlive"]+" "+NL+
 			"*%s* "+NL+
-			"*%s/%d %s* (московское время) "+NL+
+			"*%s/%d %s* (%s) "+NL+
 			"https://youtu.be/%s "+NL,
 		tgEscape(YtNextLiveTitle),
-		strings.ToTitle(monthnameru(YtNextLiveTime.In(TzMoscow).Month())),
-		YtNextLiveTime.In(TzMoscow).Day(),
-		YtNextLiveTime.In(TzMoscow).Format("15:04"),
+		strings.ToTitle(monthnameru(YtNextLiveTime.In(TgTimezone).Month())),
+		YtNextLiveTime.In(TgTimezone).Day(),
+		YtNextLiveTime.In(TgTimezone).Format("15:04"),
+		strings.ToLower(TgTimezoneName),
 		tgEscape(YtNextLiveId),
 	)
 
 	if DEBUG {
-		log("tgpostnextlive photo caption: "+NL+"%s"+NL, caption)
+		log("DEBUG tgpostnextlive photo caption: "+NL+"%s"+NL, caption)
 	}
 
 	msg, err := tgSendPhoto(TgChatId, photourl, caption)
@@ -1084,7 +1145,7 @@ func tgpostlivereminder() error {
 	var err error
 
 	text := fmt.Sprintf(
-		"Через час начало эфира "+NL+
+		TgLangMessages[TgLang]["livereminder"]+" "+NL+
 			"*%s* "+NL+
 			"https://youtu.be/%s "+NL,
 		tgEscape(YtNextLiveTitle),
@@ -1092,7 +1153,7 @@ func tgpostlivereminder() error {
 	)
 
 	if DEBUG {
-		log("tgpostlivereminder text: "+NL+"%s"+NL, text)
+		log("DEBUG tgpostlivereminder text: "+NL+"%s"+NL, text)
 	}
 
 	msg, err := tgSendMessage(TgChatId, text)
