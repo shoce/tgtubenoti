@@ -430,14 +430,14 @@ func CheckTube() (err error) {
 	}
 
 	if DEBUG {
-		log("DEBUG channel id: %s / "+"playlist id: %s / ", YtChannelId, YtPlaylistId)
+		log("DEBUG channel id: `%s` playlist id: `%s`", YtChannelId, YtPlaylistId)
 	}
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideosids []string
 	ytvideosids, err = ytplaylistitemslist(YtPlaylistId, YtLastPublishedAt)
 	if err != nil {
-		tglog("WARNING youtube list published: %s", err)
+		tglog("WARNING youtube list published: %w", err)
 	}
 
 	var ytvideos []youtube.Video
@@ -449,13 +449,13 @@ func CheckTube() (err error) {
 	}
 
 	if DEBUG {
-		for i, v := range ytvideos {
+		for j, v := range ytvideos {
 			tglog(
-				"DEBUG "+NL+"%03d/%03d id:%s title:`%s` "+NL+"publishedAt:%s "+NL+"liveStreamingDetails:%+v ",
-				i+1,
+				"DEBUG "+NL+"%d/%d "+NL+"«%s» "+NL+"youtu.be/%s "+NL+"%s "+NL+"liveStreamingDetails:%+v ",
+				j+1,
 				len(ytvideos),
-				v.Id,
 				v.Snippet.Title,
+				v.Id,
 				v.Snippet.PublishedAt,
 				v.LiveStreamingDetails,
 			)
