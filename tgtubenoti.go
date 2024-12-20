@@ -82,8 +82,9 @@ var (
 	TgTimezoneName string = "UTC"
 	TgTimezone     *time.Location
 
-	TgLang         string = "english"
-	TgLangMessages        = map[string]map[string]string{
+	TgLang string = "english"
+
+	TgLangMessages = map[string]map[string]string{
 		"deutsch": map[string]string{
 			"published":    "Neues Video",
 			"nextlive":     "Bevorstehender Livestream",
