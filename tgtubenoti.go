@@ -27,13 +27,15 @@ import (
 	"syscall"
 	"time"
 
+	etcd "go.etcd.io/etcd/client/v3"
 	youtubeoption "google.golang.org/api/option"
 	youtube "google.golang.org/api/youtube/v3"
 	yaml "gopkg.in/yaml.v3"
 )
 
 const (
-	NL = "\n"
+	NL   = "\n"
+	SPAC = "    "
 
 	//YtEventType string = "completed"
 	YtEventType string = "upcoming"
@@ -47,6 +49,13 @@ var (
 	YamlConfigPath string = "tgtubenoti.yaml"
 
 	Interval time.Duration
+
+	EtcdEndpoint     string = "etcd:2379"
+	EtcdRootPassword string
+	EtcdKeyPrefix    string
+
+	// https://pkg.go.dev/go.etcd.io/etcd/client/v3
+	EtcdClient *etcd.Client
 
 	KvToken       string
 	KvAccountId   string
@@ -132,6 +141,46 @@ func init() {
 	}
 	if YamlConfigPath == "" {
 		log("WARNING YamlConfigPath empty")
+	}
+
+	EtcdEndpoint, err = GetVar("EtcdEndpoint")
+	if err != nil {
+		log("ERROR GetVar EtcdEndpoint: %v", err)
+		os.Exit(1)
+	} else if EtcdEndpoint == "" {
+		log("WARNING EtcdEndpoint empty")
+	}
+	log("DEBUG EtcdEndpoint:`%s`", EtcdEndpoint)
+
+	EtcdRootPassword, err = GetVar("EtcdRootPassword")
+	if err != nil {
+		log("ERROR GetVar EtcdRootPassword: %v", err)
+		os.Exit(1)
+	} else if EtcdRootPassword == "" {
+		log("WARNING EtcdRootPassword empty")
+	}
+	log("DEBUG EtcdRootPassword:`%s`", EtcdRootPassword)
+
+	EtcdKeyPrefix, err = GetVar("EtcdKeyPrefix")
+	if err != nil {
+		log("ERROR GetVar EtcdKeyPrefix: %v", err)
+		os.Exit(1)
+	} else if EtcdKeyPrefix == "" {
+		log("WARNING EtcdKeyPrefix empty")
+	}
+	log("DEBUG EtcdKeyPrefix:`%s`", EtcdKeyPrefix)
+
+	if EtcdEndpoint != "" && EtcdRootPassword != "" && EtcdKeyPrefix != "" {
+		EtcdClient, err = etcd.New(etcd.Config{
+			Endpoints:   []string{EtcdEndpoint},
+			Username:    "root",
+			Password:    EtcdRootPassword,
+			DialTimeout: 3 * time.Second,
+		})
+		if err != nil {
+			log("ERROR etcd.New: %v", err)
+			os.Exit(1)
+		}
 	}
 
 	KvToken, err = GetVar("KvToken")
@@ -353,8 +402,6 @@ func init() {
 }
 
 func main() {
-	var err error
-
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGTERM)
 	go func(sigterm chan os.Signal) {
@@ -363,6 +410,10 @@ func main() {
 		log("sigterm received")
 		os.Exit(1)
 	}(sigterm)
+
+	if EtcdClient != nil {
+		defer EtcdClient.Close()
+	}
 
 	for {
 		t0 := time.Now()
@@ -626,26 +677,30 @@ func GetVar(name string) (value string, err error) {
 	}
 
 	value = os.Getenv(name)
-	if value != "" {
-		return value, nil
-	}
 
 	if YamlConfigPath != "" {
-		value, err = YamlGet(name)
-		if err != nil {
-			log("ERROR GetVar YamlGet %s: %v", name, err)
+		if v, err := YamlGet(name); err != nil {
+			log("WARNING GetVar YamlGet `%s`: %v", name, err)
 			return "", err
+		} else if v != "" {
+			value = v
 		}
-		if value != "" {
-			return value, nil
+	}
+
+	if EtcdClient != nil {
+		if v, err := EtcdGet(name); err != nil {
+			log("WARNING GetVar EtcdGet %s: %v", name, err)
+			return "", err
+		} else if v != "" {
+			value = v
 		}
 	}
 
 	if KvToken != "" && KvAccountId != "" && KvNamespaceId != "" {
 		if v, err := KvGet(name); err != nil {
-			log("ERROR GetVar KvGet %s: %v", name, err)
+			log("WARNING GetVar KvGet %s: %v", name, err)
 			return "", err
-		} else {
+		} else if v != "" {
 			value = v
 		}
 	}
@@ -655,26 +710,34 @@ func GetVar(name string) (value string, err error) {
 
 func SetVar(name, value string) (err error) {
 	if DEBUG {
-		log("DEBUG SetVar `%s`: %s", name, value)
+		log("DEBUG SetVar: %s: %s", name, value)
+	}
+
+	if EtcdClient != nil {
+		if err := EtcdSet(name, value); err != nil {
+			log("WARNING SetVar EtcdSet %s: %v", name, err)
+			return err
+		}
+		return nil
 	}
 
 	if KvToken != "" && KvAccountId != "" && KvNamespaceId != "" {
-		err = KvSet(name, value)
-		if err != nil {
+		if err := KvSet(name, value); err != nil {
+			log("WARNING SetVar KvSet %s: %v", name, err)
 			return err
 		}
 		return nil
 	}
 
 	if YamlConfigPath != "" {
-		err = YamlSet(name, value)
-		if err != nil {
+		if err := YamlSet(name, value); err != nil {
+			log("WARNING SetVar YamlSet %s: %v", name, err)
 			return err
 		}
 		return nil
 	}
 
-	return fmt.Errorf("not kv credentials nor yaml config path provided to save to")
+	return fmt.Errorf("nor etcd credentials nor kv credentials nor yaml config path provided to save to")
 }
 
 func YamlGet(name string) (value string, err error) {
@@ -740,6 +803,24 @@ func YamlSet(name, value string) error {
 		return err
 	}
 
+	return nil
+}
+
+func EtcdGet(key string) (value string, err error) {
+	if resp, err := EtcdClient.Get(context.TODO(), EtcdKeyPrefix+key); err != nil {
+		return "", err
+	} else if len(resp.Kvs) == 0 {
+		return "", nil
+	} else {
+		value = string(resp.Kvs[0].Value)
+	}
+	return value, nil
+}
+
+func EtcdSet(key, value string) error {
+	if _, err := EtcdClient.Put(context.TODO(), EtcdKeyPrefix+key, value); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -4,6 +4,10 @@ DEBUG: false
 
 YamlConfigPath: tgtubenoti.yaml
 
+EtcdEndpoint: ""
+EtcdRootPassword: ""
+EtcdKeyPrefix: ""
+
 KvToken: ""
 KvAccountId: ""
 KvNamespaceId: ""
