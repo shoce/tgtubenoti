@@ -79,8 +79,9 @@ var (
 	YtSvc        *youtube.Service
 	YtPlaylistId string
 
-	TgTimezoneName string = "UTC"
-	TgTimezone     *time.Location
+	TgTimezoneName      string = "UTC"
+	TgTimezoneNameShort string = "utc"
+	TgTimezone          *time.Location
 
 	TgLang string = "english"
 
@@ -219,6 +220,14 @@ func init() {
 		os.Exit(1)
 	}
 	log("DEBUG TgTimezoneName: %s", TgTimezoneName)
+
+	TgTimezoneNameShort := TgTimezoneName
+	TgTimezoneNameShort = strings.ToLower(TgTimezoneNameShort)
+	TgTimezoneNameShort = strings.ReplaceAll(TgTimezoneNameShort, "_", " ")
+	if i := strings.LastIndex(TgTimezoneNameShort, "/"); i >= 0 && len(TgTimezoneNameShort) > i+1 {
+		TgTimezoneNameShort = TgTimezoneNameShort[i+1:]
+	}
+	log("DEBUG TgTimezoneNameShort: %s", TgTimezoneNameShort)
 
 	TgChatId, err = GetVar("TgChatId")
 	if err != nil {
@@ -1126,7 +1135,7 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 		strings.ToTitle(monthnameru(YtNextLiveTime.In(TgTimezone).Month())),
 		YtNextLiveTime.In(TgTimezone).Day(),
 		YtNextLiveTime.In(TgTimezone).Format("15:04"),
-		strings.ToLower(TgTimezoneName),
+		TgTimezoneNameShort,
 		tgEscape(YtNextLiveId),
 	)
 
