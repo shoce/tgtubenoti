@@ -270,7 +270,7 @@ func init() {
 	}
 	log("DEBUG TgTimezoneName: %s", TgTimezoneName)
 
-	TgTimezoneNameShort := TgTimezoneName
+	TgTimezoneNameShort = TgTimezoneName
 	TgTimezoneNameShort = strings.ToLower(TgTimezoneNameShort)
 	TgTimezoneNameShort = strings.ReplaceAll(TgTimezoneNameShort, "_", " ")
 	if i := strings.LastIndex(TgTimezoneNameShort, "/"); i >= 0 && len(TgTimezoneNameShort) > i+1 {
