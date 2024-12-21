@@ -418,7 +418,7 @@ func CheckTube() (err error) {
 	err = SetVar("YtCheckLast", YtCheckLast)
 	if err != nil {
 		tglog("ERROR SetVar YtCheckLast: %s", err)
-		return fmt.Errorf("SetVar YtCheckLast: %w", err)
+		//return fmt.Errorf("SetVar YtCheckLast: %w", err)
 	}
 
 	// youtube service
