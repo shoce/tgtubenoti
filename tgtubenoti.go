@@ -493,7 +493,8 @@ func CheckTube() (err error) {
 	}
 
 	if DEBUG {
-		log("DEBUG channel id: `%s` playlist id: `%s`", YtChannelId, YtPlaylistId)
+		log("DEBUG channel id: %s", YtChannelId)
+		log("DEBUG playlist id: %s", YtPlaylistId)
 	}
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
