@@ -402,6 +402,8 @@ func init() {
 }
 
 func main() {
+	var err error
+
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGTERM)
 	go func(sigterm chan os.Signal) {
