@@ -15,6 +15,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -50,7 +51,7 @@ var (
 
 	Interval time.Duration
 
-	EtcdEndpoint     string = "etcd:2379"
+	EtcdEndpoint     string = "https://etcd:2379"
 	EtcdRootPassword string
 	EtcdKeyPrefix    string
 
@@ -171,11 +172,13 @@ func init() {
 	log("DEBUG EtcdKeyPrefix:`%s`", EtcdKeyPrefix)
 
 	if EtcdEndpoint != "" && EtcdRootPassword != "" && EtcdKeyPrefix != "" {
+		// https://pkg.go.dev/go.etcd.io/etcd/client/v3#Config
 		EtcdClient, err = etcd.New(etcd.Config{
 			Endpoints:   []string{EtcdEndpoint},
 			Username:    "root",
 			Password:    EtcdRootPassword,
 			DialTimeout: 3 * time.Second,
+			TLS:         &tls.Config{InsecureSkipVerify: true},
 		})
 		if err != nil {
 			log("ERROR etcd.New: %v", err)
