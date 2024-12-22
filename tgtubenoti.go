@@ -675,10 +675,6 @@ func tglog(msg string, args ...interface{}) error {
 }
 
 func GetVar(name string) (value string, err error) {
-	if DEBUG {
-		log("DEBUG GetVar `%s`", name)
-	}
-
 	value = os.Getenv(name)
 
 	if YamlConfigPath != "" {
