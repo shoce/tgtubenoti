@@ -1,6 +1,6 @@
 
 # https://hub.docker.com/_/golang/tags
-FROM golang:1.23.4 as build
+FROM golang:1.23.4 AS build
 RUN mkdir -p /root/tgtubenoti/
 COPY tgtubenoti.go go.mod go.sum /root/tgtubenoti/
 WORKDIR /root/tgtubenoti/
