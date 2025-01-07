@@ -29,7 +29,6 @@ jobs:
         run: |
           sed -i -e "s/__VERSION__/$VERSION/g" helm/Chart.yaml
           cat helm/Chart.yaml
-          HELM_CHART_NAME=$( yq .name helm/Chart.yaml )
           echo "HELM_CHART_NAME=$( yq .name helm/Chart.yaml )" >> $GITHUB_ENV
 
       - uses: bsord/helm-push@v4
