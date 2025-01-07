@@ -21,10 +21,7 @@ jobs:
     steps:
 
       - name: version
-        run: |
-          VERSION=$( date '+%y.%m%d.%H%M' )
-          echo "VERSION:$VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+        run: echo "VERSION=$( date '+%y.%m%d.%H%M' | sed 's/\.0*/./g' )" >> $GITHUB_ENV
 
       - uses: actions/checkout@v4
 
@@ -33,10 +30,9 @@ jobs:
           sed -i -e "s/__VERSION__/$VERSION/g" helm/Chart.yaml
           cat helm/Chart.yaml
           HELM_CHART_NAME=$( yq .name helm/Chart.yaml )
-          echo "HELM_CHART_NAME=$HELM_CHART_NAME" >> $GITHUB_ENV
+          echo "HELM_CHART_NAME=$( yq .name helm/Chart.yaml )" >> $GITHUB_ENV
 
-      - name: push
-        uses: bsord/helm-push@v4
+      - uses: bsord/helm-push@v4
         with:
           useOCIRegistry: true
           registry-url:  oci://ghcr.io/${{ github.repository }}

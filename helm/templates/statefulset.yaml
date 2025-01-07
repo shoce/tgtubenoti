@@ -1,24 +1,33 @@
 ---
 apiVersion: apps/v1
 kind: StatefulSet
+
 metadata:
   name: {{ $.Release.Name }}-tgtubenoti
   labels:
     app: {{ $.Release.Name }}-tgtubenoti
+
 spec:
+
   selector:
     matchLabels:
       app: {{ $.Release.Name }}-tgtubenoti
+
   template:
     metadata:
       name: {{ $.Release.Name }}-tgtubenoti
       labels:
         app: {{ $.Release.Name }}-tgtubenoti
+      annotations:
+        checksum/configmap: {{ include ( print $.Template.BasePath "/" "configmap.yaml" ) . | sha256sum }}
+
     spec:
+
       containers:
+
         - name: {{ $.Release.Name }}-tgtubenoti
-          imagePullPolicy: IfNotPresent
           image: "{{ $.Values.ImageNameTgTubeNoti }}:{{ $.Values.ImageTagTgTubeNoti }}"
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
                 name: {{ $.Release.Name }}-tgtubenoti

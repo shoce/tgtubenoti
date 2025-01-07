@@ -3,6 +3,11 @@
 https://console.cloud.google.com/apis/credentials
 https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas
 
+        # every search requests costs 100 quota
+        # total quota limit is 10'000 per day
+        # twice an hour schedule uses 4800 quota per day
+        # trice an hour schedule uses 7200 quota per day
+
 
 GoGet
 GoFmt
@@ -15,12 +20,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"sort"
@@ -28,7 +32,6 @@ import (
 	"syscall"
 	"time"
 
-	etcd "go.etcd.io/etcd/client/v3"
 	youtubeoption "google.golang.org/api/option"
 	youtube "google.golang.org/api/youtube/v3"
 	yaml "gopkg.in/yaml.v3"
@@ -44,56 +47,49 @@ const (
 	YtMaxResults = 50
 )
 
-var (
-	DEBUG bool
+type TgTubeNotiConfig struct {
+	DEBUG bool `yaml:"DEBUG"`
 
-	YamlConfigPath string = "tgtubenoti.yaml"
+	Interval time.Duration `yaml:"Interval"`
 
-	Interval time.Duration
-
-	EtcdEndpoint     string = "etcd:2379"
-	EtcdRootPassword string
-	EtcdKeyPrefix    string
-
-	// https://pkg.go.dev/go.etcd.io/etcd/client/v3
-	EtcdClient *etcd.Client
-
-	KvToken       string
-	KvAccountId   string
-	KvNamespaceId string
-
-	TgToken      string
-	TgChatId     string
-	TgBossChatId string
+	TgToken      string `yaml:"TgToken"`
+	TgChatId     string `yaml:"TgChatId"`
+	TgBossChatId string `yaml:"TgBossChatId"`
 
 	// https://console.cloud.google.com/apis/credentials
-	YtKey       string
-	YtUsername  string
-	YtChannelId string
+	YtKey        string `yaml:"YtKey"`
+	YtUsername   string `yaml:"YtUsername"`
+	YtChannelId  string `yaml:"YtChannelId"`
+	YtPlaylistId string `yaml:"YtPlaylistId"`
 
-	YtCheckInterval         string
-	YtCheckIntervalDuration time.Duration
-	YtCheckLast             string
-	YtCheckLastTime         time.Time
+	YtCheckInterval time.Duration `yaml:"YtCheckInterval"`
+	YtCheckLast     time.Time     `yaml:"YtCheckLast"`
 
-	YtNextLive             string
-	YtNextLiveTime         time.Time
-	YtNextLiveId           string
-	YtNextLiveTitle        string
-	YtNextLiveReminderSent string
+	YtNextLive             time.Time `yaml:"YtNextLive"`
+	YtNextLiveId           string    `yaml:"YtNextLiveId"`
+	YtNextLiveTitle        string    `yaml:"YtNextLiveTitle"`
+	YtNextLiveReminderSent bool      `yaml:"YtNextLiveReminderSent"`
 
-	YtLastPublishedAt string
+	YtLastPublishedAt string `yaml:"YtLastPublishedAt"`
+
+	TgTimezoneName      string `yaml:"TgTimezoneName"`
+	TgTimezoneNameShort string `yaml:"TgTimezoneNameShort"`
+	TgLang              string `yaml:"TgLang"`
+}
+
+var (
+	YssUrl  string
+	YssName string
+
+	YssUrlName string
+
+	Config TgTubeNotiConfig
 
 	HttpClient = &http.Client{}
 
-	YtSvc        *youtube.Service
-	YtPlaylistId string
+	YtSvc *youtube.Service
 
-	TgTimezoneName      string = "UTC"
-	TgTimezoneNameShort string = "utc"
-	TgTimezone          *time.Location
-
-	TgLang string = "english"
+	TgTimezone *time.Location
 
 	TgLangMessages = map[string]map[string]string{
 		"deutsch": map[string]string{
@@ -137,271 +133,97 @@ var (
 func init() {
 	var err error
 
-	if os.Getenv("YamlConfigPath") != "" {
-		YamlConfigPath = os.Getenv("YamlConfigPath")
+	if v := os.Getenv("YssUrl"); v != "" {
+		YssUrl = v
 	}
-	if YamlConfigPath == "" {
-		log("WARNING YamlConfigPath empty")
+	if YssUrl == "" {
+		log("ERROR YssUrl empty")
+		os.Exit(1)
 	}
 
-	EtcdEndpoint, err = GetVar("EtcdEndpoint")
+	if v := os.Getenv("YssName"); v != "" {
+		YssName = v
+	}
+	if YssName == "" {
+		log("ERROR YssName empty")
+		os.Exit(1)
+	}
+
+	YssUrlName, err = url.JoinPath(YssUrl, YssName)
 	if err != nil {
-		log("ERROR GetVar EtcdEndpoint: %v", err)
-		os.Exit(1)
-	} else if EtcdEndpoint == "" {
-		log("WARNING EtcdEndpoint empty")
-	}
-	log("DEBUG EtcdEndpoint:`%s`", EtcdEndpoint)
-
-	EtcdRootPassword, err = GetVar("EtcdRootPassword")
-	if err != nil {
-		log("ERROR GetVar EtcdRootPassword: %v", err)
-		os.Exit(1)
-	} else if EtcdRootPassword == "" {
-		log("WARNING EtcdRootPassword empty")
-	}
-	log("DEBUG EtcdRootPassword:`%s`", EtcdRootPassword)
-
-	EtcdKeyPrefix, err = GetVar("EtcdKeyPrefix")
-	if err != nil {
-		log("ERROR GetVar EtcdKeyPrefix: %v", err)
-		os.Exit(1)
-	} else if EtcdKeyPrefix == "" {
-		log("WARNING EtcdKeyPrefix empty")
-	}
-	log("DEBUG EtcdKeyPrefix:`%s`", EtcdKeyPrefix)
-
-	if EtcdEndpoint != "" && EtcdRootPassword != "" && EtcdKeyPrefix != "" {
-		// https://pkg.go.dev/go.etcd.io/etcd/client/v3#Config
-		EtcdClient, err = etcd.New(etcd.Config{
-			Endpoints:   []string{EtcdEndpoint},
-			Username:    "root",
-			Password:    EtcdRootPassword,
-			DialTimeout: 3 * time.Second,
-			TLS:         &tls.Config{InsecureSkipVerify: true},
-		})
-		if err != nil {
-			log("ERROR etcd.New: %v", err)
-			os.Exit(1)
-		}
-	}
-
-	KvToken, err = GetVar("KvToken")
-	if err != nil {
-		log("ERROR %s", err)
+		log("ERROR JoinPath %s %s: %s", err)
 		os.Exit(1)
 	}
-	if KvToken == "" {
-		log("WARNING KvToken empty")
-	}
 
-	KvAccountId, err = GetVar("KvAccountId")
-	if err != nil {
-		log("ERROR %s", err)
+	if err := Config.Get(); err != nil {
+		log("ERROR Config.Get: %v", err)
 		os.Exit(1)
 	}
-	if KvAccountId == "" {
-		log("WARNING KvAccountId empty")
-	}
 
-	KvNamespaceId, err = GetVar("KvNamespaceId")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-	if KvNamespaceId == "" {
-		log("WARNING KvNamespaceId empty")
-	}
-
-	if v, err := GetVar("DEBUG"); err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	} else if v != "" {
-		DEBUG = true
-	}
-
-	if s, _ := GetVar("Interval"); s != "" {
-		Interval, err = time.ParseDuration(s)
-		if err != nil {
-			log("ERROR time.ParseDuration Interval:`%s`: %v", s, err)
-			os.Exit(1)
-		}
-		log("Interval: %v", Interval)
-	} else {
+	log("Interval: %v", Config.Interval)
+	if Config.Interval == 0 {
 		log("ERROR Interval empty")
 		os.Exit(1)
 	}
 
-	TgToken, err = GetVar("TgToken")
-	if err != nil {
-		log("ERROR %w", err)
-		os.Exit(1)
-	}
-	if TgToken == "" {
+	if Config.TgToken == "" {
 		log("ERROR TgToken empty")
 		os.Exit(1)
 	}
 
-	TgLang, err = GetVar("TgLang")
-	if err != nil {
-		log("ERROR %w", err)
-		os.Exit(1)
-	}
-	if TgLang == "" {
+	if Config.TgLang == "" {
 		log("ERROR TgLang empty")
 		os.Exit(1)
 	}
-	if _, ok := TgLangMessages[TgLang]; !ok {
+	if _, ok := TgLangMessages[Config.TgLang]; !ok {
 		log("ERROR TgLang `%s` not supported")
 		os.Exit(1)
 	}
-	log("DEBUG TgLang: %s", TgLang)
+	log("DEBUG TgLang: %s", Config.TgLang)
 
-	TgTimezoneName, err = GetVar("TgTimezoneName")
-	if err != nil {
-		log("ERROR %w", err)
-		os.Exit(1)
-	}
-	if TgTimezoneName == "" {
+	if Config.TgTimezoneName == "" {
 		log("ERROR TgTimezoneName empty")
 		os.Exit(1)
 	}
-	TgTimezone, err = time.LoadLocation(TgTimezoneName)
+	TgTimezone, err = time.LoadLocation(Config.TgTimezoneName)
 	if err != nil {
-		tglog("ERROR time.LoadLocation `%s`: %w", TgTimezoneName, err)
+		tglog("ERROR time.LoadLocation `%s`: %w", Config.TgTimezoneName, err)
 		os.Exit(1)
 	}
-	log("DEBUG TgTimezoneName: %s", TgTimezoneName)
+	log("DEBUG TgTimezoneName: %s", Config.TgTimezoneName)
 
-	TgTimezoneNameShort = TgTimezoneName
-	TgTimezoneNameShort = strings.ToLower(TgTimezoneNameShort)
-	TgTimezoneNameShort = strings.ReplaceAll(TgTimezoneNameShort, "_", " ")
-	if i := strings.LastIndex(TgTimezoneNameShort, "/"); i >= 0 && len(TgTimezoneNameShort) > i+1 {
-		TgTimezoneNameShort = TgTimezoneNameShort[i+1:]
+	Config.TgTimezoneNameShort = Config.TgTimezoneName
+	Config.TgTimezoneNameShort = strings.ToLower(Config.TgTimezoneNameShort)
+	Config.TgTimezoneNameShort = strings.ReplaceAll(Config.TgTimezoneNameShort, "_", " ")
+	if i := strings.LastIndex(Config.TgTimezoneNameShort, "/"); i >= 0 && len(Config.TgTimezoneNameShort) > i+1 {
+		Config.TgTimezoneNameShort = Config.TgTimezoneNameShort[i+1:]
 	}
-	log("DEBUG TgTimezoneNameShort: %s", TgTimezoneNameShort)
+	log("DEBUG TgTimezoneNameShort: %s", Config.TgTimezoneNameShort)
 
-	TgChatId, err = GetVar("TgChatId")
-	if err != nil {
-		log("ERROR %w", err)
-		os.Exit(1)
-	}
-	if TgChatId == "" {
+	if Config.TgChatId == "" {
 		log("ERROR TgChatId empty")
 		os.Exit(1)
 	}
 
-	TgBossChatId, err = GetVar("TgBossChatId")
-	if err != nil {
-		log("ERROR %w", err)
-		os.Exit(1)
-	}
-	if TgBossChatId == "" {
+	if Config.TgBossChatId == "" {
 		log("ERROR TgBossChatId empty")
 		os.Exit(1)
 	}
 
-	YtKey, err = GetVar("YtKey")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-	if YtKey == "" {
+	if Config.YtKey == "" {
 		log("ERROR: YtKey empty")
 		os.Exit(1)
 	}
 
-	YtUsername, err = GetVar("YtUsername")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-
-	YtChannelId, err = GetVar("YtChannelId")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-
-	if YtUsername == "" && YtChannelId == "" {
+	if Config.YtUsername == "" && Config.YtChannelId == "" {
 		tglog("YtUsername and YtChannelId empty")
 		os.Exit(1)
 	}
 
-	YtCheckInterval, err = GetVar("YtCheckInterval")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-	if YtCheckInterval == "" {
+	if Config.YtCheckInterval == 0 {
 		log("ERROR YtCheckInterval empty")
 		os.Exit(1)
 	}
-	YtCheckIntervalDuration, err = time.ParseDuration(YtCheckInterval)
-	if err != nil {
-		log("ERROR YtCheckInterval %s", err)
-		os.Exit(1)
-	}
-
-	YtCheckLast, err = GetVar("YtCheckLast")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-	if YtCheckLast != "" {
-		YtCheckLastTime, err = time.Parse(time.RFC3339, YtCheckLast)
-		log("YtCheckLastTime: %v", YtCheckLastTime)
-		if err != nil {
-			log("WARNING YtCheckLast %s", err)
-			log("WARNING YtCheckLast setting to empty")
-			err = SetVar("YtCheckLast", "")
-			if err != nil {
-				tglog("WARNING SetVar YtCheckLast: %s", err)
-			}
-		}
-	}
-
-	YtNextLive, err = GetVar("YtNextLive")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-	if YtNextLive != "" {
-		YtNextLiveTime, err = time.Parse(time.RFC3339, YtNextLive)
-		if err != nil {
-			log("WARNING YtNextLive Parse: %s", err)
-			log("WARNING YtNextLive setting to empty")
-			err = SetVar("YtNextLive", "")
-			if err != nil {
-				tglog("WARNING SetVar YtNextLive: %s", err)
-			}
-		}
-	}
-
-	YtNextLiveId, err = GetVar("YtNextLiveId")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-
-	YtNextLiveTitle, err = GetVar("YtNextLiveTitle")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-
-	YtNextLiveReminderSent, err = GetVar("YtNextLiveReminderSent")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-
-	YtLastPublishedAt, err = GetVar("YtLastPublishedAt")
-	if err != nil {
-		log("ERROR %s", err)
-		os.Exit(1)
-	}
-
 }
 
 func main() {
@@ -416,10 +238,6 @@ func main() {
 		os.Exit(1)
 	}(sigterm)
 
-	if EtcdClient != nil {
-		defer EtcdClient.Close()
-	}
-
 	for {
 		t0 := time.Now()
 
@@ -428,30 +246,30 @@ func main() {
 			log("WARNING CheckTube: %v", err)
 		}
 
-		if dur := time.Now().Sub(t0); dur < Interval {
-			time.Sleep(Interval - dur)
+		if dur := time.Now().Sub(t0); dur < Config.Interval {
+			time.Sleep(Config.Interval - dur)
 		}
 	}
 
 }
 
 func CheckTube() (err error) {
-	if DEBUG {
-		if YtNextLiveReminderSent != "true" && time.Now().Before(YtNextLiveTime) {
-			log("DEBUG next live %s `%s` in %s", YtNextLiveId, YtNextLiveTitle, YtNextLiveTime.Sub(time.Now()).Truncate(time.Minute))
+	if Config.DEBUG {
+		if !Config.YtNextLiveReminderSent && time.Now().Before(Config.YtNextLive) {
+			log("DEBUG next live %s `%s` in %s", Config.YtNextLiveId, Config.YtNextLiveTitle, Config.YtNextLive.Sub(time.Now()).Truncate(time.Minute))
 		}
 	}
 
-	if tonextlive := YtNextLiveTime.Sub(time.Now()); tonextlive > 57*time.Minute && tonextlive < 61*time.Minute {
-		if YtNextLiveReminderSent != "true" {
+	if tonextlive := Config.YtNextLive.Sub(time.Now()); tonextlive > 57*time.Minute && tonextlive < 61*time.Minute {
+		if !Config.YtNextLiveReminderSent {
 			err = tgpostlivereminder()
 			if err != nil {
 				tglog("WARNING telegram post next live reminder: %s", err)
 			} else {
-				YtNextLiveReminderSent = "true"
-				err = SetVar("YtNextLiveReminderSent", YtNextLiveReminderSent)
+				Config.YtNextLiveReminderSent = true
+				err = Config.Put()
 				if err != nil {
-					tglog("WARNING SetVar YtNextLiveReminderSent: %s", err)
+					log("ERROR Config.Put: %s", err)
 				}
 			}
 		}
@@ -459,50 +277,48 @@ func CheckTube() (err error) {
 
 	// wait for YtCheckIntervalDuration
 
-	if time.Now().Sub(YtCheckLastTime) < YtCheckIntervalDuration {
-		if DEBUG {
-			log("DEBUG next youtube check in %v", YtCheckLastTime.Add(YtCheckIntervalDuration).Sub(time.Now()).Truncate(time.Second))
+	if time.Now().Sub(Config.YtCheckLast) < Config.YtCheckInterval {
+		if Config.DEBUG {
+			log("DEBUG next youtube check in %v", Config.YtCheckLast.Add(Config.YtCheckInterval).Sub(time.Now()).Truncate(time.Second))
 		}
 		return nil
 	}
 
 	// update YtCheckLastTime
 
-	YtCheckLastTime = time.Now()
+	Config.YtCheckLast = time.Now().UTC().Truncate(time.Second)
 
-	YtCheckLast = YtCheckLastTime.UTC().Format(time.RFC3339)
-	err = SetVar("YtCheckLast", YtCheckLast)
+	err = Config.Put()
 	if err != nil {
-		tglog("ERROR SetVar YtCheckLast: %s", err)
-		//return fmt.Errorf("SetVar YtCheckLast: %w", err)
+		log("ERROR Config.Put: %s", err)
 	}
 
 	// youtube service
 
-	YtSvc, err = youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(YtKey))
+	YtSvc, err = youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(Config.YtKey))
 	if err != nil {
 		tglog("ERROR youtube.NewService: %w", err)
 		return fmt.Errorf("youtube.NewService: %w", err)
 	}
 
-	YtPlaylistId, err = ytgetplaylistid(YtUsername, YtChannelId)
+	Config.YtPlaylistId, err = ytgetplaylistid(Config.YtUsername, Config.YtChannelId)
 	if err != nil {
 		tglog("ERROR get youtube playlist id: %w", err)
 		return fmt.Errorf("get youtube playlist id: %w", err)
 	}
-	if YtPlaylistId == "" {
+	if Config.YtPlaylistId == "" {
 		tglog("ERROR YtPlaylistId empty")
 		return fmt.Errorf("YtPlaylistId empty")
 	}
 
-	if DEBUG {
-		log("DEBUG channel id: %s", YtChannelId)
-		log("DEBUG playlist id: %s", YtPlaylistId)
+	if Config.DEBUG {
+		log("DEBUG channel id: %s", Config.YtChannelId)
+		log("DEBUG playlist id: %s", Config.YtPlaylistId)
 	}
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideosids []string
-	ytvideosids, err = ytplaylistitemslist(YtPlaylistId, YtLastPublishedAt)
+	ytvideosids, err = ytplaylistitemslist(Config.YtPlaylistId, Config.YtLastPublishedAt)
 	if err != nil {
 		tglog("WARNING youtube list published: %w", err)
 	}
@@ -515,7 +331,7 @@ func CheckTube() (err error) {
 		}
 	}
 
-	if DEBUG {
+	if Config.DEBUG {
 		for j, v := range ytvideos {
 			tglog(
 				"DEBUG "+NL+"%d/%d "+NL+"«%s» "+NL+"youtu.be/%s "+NL+"%s "+NL+"liveStreamingDetails:%+v ",
@@ -531,15 +347,16 @@ func CheckTube() (err error) {
 
 	for _, v := range ytvideos {
 
-		if v.Snippet.PublishedAt <= YtLastPublishedAt {
+		if v.Snippet.PublishedAt <= Config.YtLastPublishedAt {
 
 			// skip
-			tglog("skipping video: %s %s<=%s", v.Id, v.Snippet.PublishedAt, YtLastPublishedAt)
+			tglog("skipping video: %s %s<=%s", v.Id, v.Snippet.PublishedAt, Config.YtLastPublishedAt)
 
-			YtLastPublishedAt = v.Snippet.PublishedAt
-			err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
+			Config.YtLastPublishedAt = v.Snippet.PublishedAt
+
+			err = Config.Put()
 			if err != nil {
-				tglog("WARNING SetVar YtLastPublishedAt: %s", err)
+				log("ERROR Config.Put: %s", err)
 			}
 
 		} else if v.LiveStreamingDetails == nil || v.LiveStreamingDetails.ActualEndTime != "" {
@@ -552,10 +369,11 @@ func CheckTube() (err error) {
 				return fmt.Errorf("telegram post published youtube video: %w", err)
 			}
 
-			YtLastPublishedAt = v.Snippet.PublishedAt
-			err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
+			Config.YtLastPublishedAt = v.Snippet.PublishedAt
+
+			err = Config.Put()
 			if err != nil {
-				tglog("WARNING SetVar YtLastPublishedAt: %w", err)
+				log("ERROR Config.Put: %s", err)
 			}
 
 		} else if v.LiveStreamingDetails.ActualStartTime != "" && v.LiveStreamingDetails.ActualEndTime == "" {
@@ -566,32 +384,18 @@ func CheckTube() (err error) {
 
 			// live
 
-			YtNextLive = v.LiveStreamingDetails.ScheduledStartTime
-			err = SetVar("YtNextLive", YtNextLive)
-			if err != nil {
-				tglog("ERROR SetVar YtNextLive: %w", err)
-				return fmt.Errorf("SetVar YtNextLive: %w", err)
+			if v, err := time.Parse(v.LiveStreamingDetails.ScheduledStartTime, time.RFC3339); err == nil {
+				Config.YtNextLive = v
+			} else {
+				log("ERROR parse LiveStreamingDetails.ScheduledStartTime: %s", err)
 			}
+			Config.YtNextLiveId = v.Id
+			Config.YtNextLiveTitle = v.Snippet.Title
+			Config.YtNextLiveReminderSent = false
 
-			YtNextLiveId = v.Id
-			err = SetVar("YtNextLiveId", YtNextLiveId)
+			err = Config.Put()
 			if err != nil {
-				tglog("ERROR SetVar YtNextLiveId: %2", err)
-				return fmt.Errorf("SetVar YtNextLiveId: %w", err)
-			}
-
-			YtNextLiveTitle = v.Snippet.Title
-			err = SetVar("YtNextLiveTitle", YtNextLiveTitle)
-			if err != nil {
-				tglog("ERROR SetVar YtNextLiveTitle: %w", err)
-				return fmt.Errorf("SetVar YtNextLiveTitle: %w", err)
-			}
-
-			YtNextLiveReminderSent = ""
-			err = SetVar("YtNextLiveReminderSent", YtNextLiveReminderSent)
-			if err != nil {
-				tglog("ERROR SetVar YtNextLiveReminderSent: %w", err)
-				return fmt.Errorf("SetVar YtNextLiveReminderSent: %w", err)
+				log("ERROR Config.Put: %s", err)
 			}
 
 			err = tgpostnextlive(v)
@@ -600,12 +404,12 @@ func CheckTube() (err error) {
 				return fmt.Errorf("telegram post next live: %w", err)
 			}
 
-			YtLastPublishedAt = v.Snippet.PublishedAt
-			err = SetVar("YtLastPublishedAt", YtLastPublishedAt)
-			if err != nil {
-				tglog("WARNING SetVar YtLastPublishedAt: %s", err)
-			}
+			Config.YtLastPublishedAt = v.Snippet.PublishedAt
 
+			err = Config.Put()
+			if err != nil {
+				log("ERROR Config.Put: %s", err)
+			}
 		}
 
 	}
@@ -616,7 +420,7 @@ func CheckTube() (err error) {
 func log(msg string, args ...interface{}) {
 	t := time.Now().Local()
 	ts := fmt.Sprintf(
-		"%03d."+"%02d%02d."+"%02d"+"%02d.",
+		"%03d%02d%02d:"+"%02d%02d",
 		t.Year()%1000, t.Month(), t.Day(), t.Hour(), t.Minute(),
 	)
 	msgtext := fmt.Sprintf("%s %s", ts, msg) + NL
@@ -643,7 +447,7 @@ func tglog(msg string, args ...interface{}) error {
 	}
 
 	smreq := TgSendMessageRequest{
-		ChatId:              TgBossChatId,
+		ChatId:              Config.TgBossChatId,
 		Text:                msgtext,
 		ParseMode:           "",
 		DisableNotification: true,
@@ -655,7 +459,7 @@ func tglog(msg string, args ...interface{}) error {
 	smreqjsBuffer := bytes.NewBuffer(smreqjs)
 
 	var resp *http.Response
-	tgapiurl := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", TgToken)
+	tgapiurl := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", Config.TgToken)
 	resp, err = http.Post(
 		tgapiurl,
 		"application/json",
@@ -677,212 +481,61 @@ func tglog(msg string, args ...interface{}) error {
 	return nil
 }
 
-func GetVar(name string) (value string, err error) {
-	value = os.Getenv(name)
+func (config *TgTubeNotiConfig) Get() error {
+	log("DEBUG Config.Get %s", YssUrlName)
 
-	if YamlConfigPath != "" {
-		if v, err := YamlGet(name); err != nil {
-			log("WARNING GetVar YamlGet `%s`: %v", name, err)
-			return "", err
-		} else if v != "" {
-			value = v
-		}
-	}
-
-	if EtcdClient != nil {
-		if v, err := EtcdGet(name); err != nil {
-			log("WARNING GetVar EtcdGet %s: %v", name, err)
-			return "", err
-		} else if v != "" {
-			value = v
-		}
-	}
-
-	if KvToken != "" && KvAccountId != "" && KvNamespaceId != "" {
-		if v, err := KvGet(name); err != nil {
-			log("WARNING GetVar KvGet %s: %v", name, err)
-			return "", err
-		} else if v != "" {
-			value = v
-		}
-	}
-
-	return value, nil
-}
-
-func SetVar(name, value string) (err error) {
-	if DEBUG {
-		log("DEBUG SetVar: %s: %s", name, value)
-	}
-
-	if EtcdClient != nil {
-		if err := EtcdSet(name, value); err != nil {
-			log("WARNING SetVar EtcdSet %s: %v", name, err)
-			return err
-		}
-		return nil
-	}
-
-	if KvToken != "" && KvAccountId != "" && KvNamespaceId != "" {
-		if err := KvSet(name, value); err != nil {
-			log("WARNING SetVar KvSet %s: %v", name, err)
-			return err
-		}
-		return nil
-	}
-
-	if YamlConfigPath != "" {
-		if err := YamlSet(name, value); err != nil {
-			log("WARNING SetVar YamlSet %s: %v", name, err)
-			return err
-		}
-		return nil
-	}
-
-	return fmt.Errorf("nor etcd credentials nor kv credentials nor yaml config path provided to save to")
-}
-
-func YamlGet(name string) (value string, err error) {
-	configf, err := os.Open(YamlConfigPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
-		return "", err
-	}
-	defer configf.Close()
-
-	configm := make(map[interface{}]interface{})
-	if err = yaml.NewDecoder(configf).Decode(&configm); err != nil {
-		if DEBUG {
-			log("DEBUG yaml.Decode %s: %v", YamlConfigPath, err)
-		}
-		return "", err
-	}
-
-	if v, ok := configm[name]; ok == true {
-		switch v.(type) {
-		case string:
-			value = v.(string)
-		case int:
-			value = fmt.Sprintf("%d", v.(int))
-		default:
-			return "", fmt.Errorf("yaml value of unsupported type, only string and int types are supported")
-		}
-	}
-
-	return value, nil
-}
-
-func YamlSet(name, value string) error {
-	configf, err := os.Open(YamlConfigPath)
-	if err == nil {
-		configm := make(map[interface{}]interface{})
-		err := yaml.NewDecoder(configf).Decode(&configm)
-		if err != nil {
-			log("WARNING yaml.Decode %s: %v", YamlConfigPath, err)
-		}
-		configf.Close()
-		configm[name] = value
-		configf, err := os.Create(YamlConfigPath)
-		if err == nil {
-			defer configf.Close()
-			confige := yaml.NewEncoder(configf)
-			err := confige.Encode(configm)
-			if err == nil {
-				confige.Close()
-				configf.Close()
-			} else {
-				log("WARNING yaml.Encoder.Encode: %v", err)
-				return err
-			}
-		} else {
-			log("WARNING os.Create config file %s: %v", YamlConfigPath, err)
-			return err
-		}
-	} else {
-		log("WARNING os.Open config file %s: %v", YamlConfigPath, err)
-		return err
-	}
-
-	return nil
-}
-
-func EtcdGet(key string) (value string, err error) {
-	if resp, err := EtcdClient.Get(context.TODO(), EtcdKeyPrefix+key); err != nil {
-		return "", err
-	} else if len(resp.Kvs) == 0 {
-		return "", nil
-	} else {
-		value = string(resp.Kvs[0].Value)
-	}
-	return value, nil
-}
-
-func EtcdSet(key, value string) error {
-	if _, err := EtcdClient.Put(context.TODO(), EtcdKeyPrefix+key, value); err != nil {
-		return err
-	}
-	return nil
-}
-
-func KvGet(name string) (value string, err error) {
-	req, err := http.NewRequest(
-		"GET",
-		fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/storage/kv/namespaces/%s/values/%s", KvAccountId, KvNamespaceId, name),
-		nil,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", KvToken))
-	resp, err := HttpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("kv api response status: %s", resp.Status)
-	}
-
-	if rbb, err := io.ReadAll(resp.Body); err != nil {
-		return "", err
-	} else {
-		value = string(rbb)
-	}
-
-	return value, nil
-}
-
-func KvSet(name, value string) error {
-	mpbb := new(bytes.Buffer)
-	mpw := multipart.NewWriter(mpbb)
-	if err := mpw.WriteField("metadata", "{}"); err != nil {
-		return err
-	}
-	if err := mpw.WriteField("value", value); err != nil {
-		return err
-	}
-	mpw.Close()
-
-	req, err := http.NewRequest(
-		"PUT",
-		fmt.Sprintf("https://api.cloudflare.com/client/v4/accounts/%s/storage/kv/namespaces/%s/values/%s", KvAccountId, KvNamespaceId, name),
-		mpbb,
-	)
+	req, err := http.NewRequest(http.MethodGet, YssUrlName, nil)
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("Content-Type", mpw.FormDataContentType())
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", KvToken))
 	resp, err := HttpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("kv api response status: %s", resp.Status)
+		return fmt.Errorf("yss response status %s", resp.Status)
 	}
+
+	rbb, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	//log("DEBUG Config.Get: %s", rbb)
+
+	if err := yaml.Unmarshal(rbb, config); err != nil {
+		return err
+	}
+
+	log("DEBUG Config.Get: %+v", config)
+
+	return nil
+}
+
+func (config *TgTubeNotiConfig) Put() error {
+	log("DEBUG Config.Put %s %+v", YssUrlName, config)
+
+	rbb, err := yaml.Marshal(config)
+	if err != nil {
+		return err
+	}
+
+	//log("DEBUG Config.Put %s", string(rbb))
+
+	req, err := http.NewRequest(http.MethodPut, YssUrlName, bytes.NewBuffer(rbb))
+	if err != nil {
+		return err
+	}
+
+	resp, err := HttpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("yss response status %s", resp.Status)
+	}
+	//log("DEBUG Config.Put response status code %s", resp.Status)
 
 	return nil
 }
@@ -1009,7 +662,7 @@ func tgSendPhoto(chatid, photourl, caption string) (msg *TgMessage, err error) {
 
 	var tgresp TgResponse
 	err = httpPostJson(
-		fmt.Sprintf("https://api.telegram.org/bot%s/sendPhoto", TgToken),
+		fmt.Sprintf("https://api.telegram.org/bot%s/sendPhoto", Config.TgToken),
 		bytes.NewBuffer(sendphotojson),
 		&tgresp,
 	)
@@ -1046,7 +699,7 @@ func tgSendMessage(chatid, text string) (msg *TgMessage, err error) {
 
 	var tgresp TgResponse
 	err = httpPostJson(
-		fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", TgToken),
+		fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", Config.TgToken),
 		bytes.NewBuffer(sendmessagejson),
 		&tgresp,
 	)
@@ -1127,7 +780,7 @@ func ytvideoslist(ytvideosids []string) (ytvideos []youtube.Video, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("videos list: %w", err)
 	}
-	if DEBUG {
+	if Config.DEBUG {
 		log("DEBUG videos.list response: %+v", rv)
 	}
 
@@ -1157,30 +810,28 @@ func ytvideoPhotoUrl(ytthumbs youtube.ThumbnailDetails) (photourl string) {
 }
 
 func tgpostpublished(ytvideo youtube.Video) error {
-	var err error
-
 	var photourl string
 	if ytvideo.Snippet.Thumbnails != nil {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	if DEBUG {
+	if Config.DEBUG {
 		log("DEBUG photourl: %s"+NL, photourl)
 	}
 
 	caption := fmt.Sprintf(
-		TgLangMessages[TgLang]["published"]+" "+NL+
+		TgLangMessages[Config.TgLang]["published"]+" "+NL+
 			"*%s* "+NL+
 			"https://youtu.be/%s "+NL,
 		tgEscape(ytvideo.Snippet.Title),
 		tgEscape(ytvideo.Id),
 	)
 
-	if DEBUG {
+	if Config.DEBUG {
 		log("DEBUG tgpostpublished photo caption: "+NL+"%s"+NL, caption)
 	}
 
-	msg, err := tgSendPhoto(TgChatId, photourl, caption)
+	msg, err := tgSendPhoto(Config.TgChatId, photourl, caption)
 	if err != nil {
 		return fmt.Errorf("telegram send photo: %w", err)
 	}
@@ -1193,40 +844,33 @@ func tgpostpublished(ytvideo youtube.Video) error {
 func tgpostnextlive(ytvideo youtube.Video) error {
 	var err error
 
-	if YtNextLive != "" {
-		YtNextLiveTime, err = time.Parse(time.RFC3339, YtNextLive)
-		if err != nil {
-			return fmt.Errorf("time.Parse YtNextLive: %w", err)
-		}
-	}
-
 	var photourl string
 	if ytvideo.Snippet.Thumbnails != nil {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	if DEBUG {
+	if Config.DEBUG {
 		log("DEBUG tgpostnextlive photourl: %s"+NL, photourl)
 	}
 
 	caption := fmt.Sprintf(
-		TgLangMessages[TgLang]["nextlive"]+" "+NL+
+		TgLangMessages[Config.TgLang]["nextlive"]+" "+NL+
 			"*%s* "+NL+
 			"*%s/%d %s* (%s) "+NL+
 			"https://youtu.be/%s "+NL,
-		tgEscape(YtNextLiveTitle),
-		strings.ToTitle(monthnameru(YtNextLiveTime.In(TgTimezone).Month())),
-		YtNextLiveTime.In(TgTimezone).Day(),
-		YtNextLiveTime.In(TgTimezone).Format("15:04"),
-		TgTimezoneNameShort,
-		tgEscape(YtNextLiveId),
+		tgEscape(Config.YtNextLiveTitle),
+		strings.ToTitle(monthnameru(Config.YtNextLive.In(TgTimezone).Month())),
+		Config.YtNextLive.In(TgTimezone).Day(),
+		Config.YtNextLive.In(TgTimezone).Format("15:04"),
+		Config.TgTimezoneNameShort,
+		tgEscape(Config.YtNextLiveId),
 	)
 
-	if DEBUG {
+	if Config.DEBUG {
 		log("DEBUG tgpostnextlive photo caption: "+NL+"%s"+NL, caption)
 	}
 
-	msg, err := tgSendPhoto(TgChatId, photourl, caption)
+	msg, err := tgSendPhoto(Config.TgChatId, photourl, caption)
 	if err != nil {
 		return fmt.Errorf("telegram send photo: %w", err)
 	}
@@ -1240,18 +884,18 @@ func tgpostlivereminder() error {
 	var err error
 
 	text := fmt.Sprintf(
-		TgLangMessages[TgLang]["livereminder"]+" "+NL+
+		TgLangMessages[Config.TgLang]["livereminder"]+" "+NL+
 			"*%s* "+NL+
 			"https://youtu.be/%s "+NL,
-		tgEscape(YtNextLiveTitle),
-		tgEscape(YtNextLiveId),
+		tgEscape(Config.YtNextLiveTitle),
+		tgEscape(Config.YtNextLiveId),
 	)
 
-	if DEBUG {
+	if Config.DEBUG {
 		log("DEBUG tgpostlivereminder text: "+NL+"%s"+NL, text)
 	}
 
-	msg, err := tgSendMessage(TgChatId, text)
+	msg, err := tgSendMessage(Config.TgChatId, text)
 	if err != nil {
 		return fmt.Errorf("telegram send message: %w", err)
 	}

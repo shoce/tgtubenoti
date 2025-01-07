@@ -2,15 +2,8 @@
 
 DEBUG: false
 
-YamlConfigPath: tgtubenoti.yaml
-
-EtcdEndpoint: ""
-EtcdRootPassword: ""
-EtcdKeyPrefix: ""
-
-KvToken: ""
-KvAccountId: ""
-KvNamespaceId: ""
+YssUrl: https://yss
+YssName: tgtubenoti
 
 TgToken: ""
 TgChatId: ""
