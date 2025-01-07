@@ -1,8 +1,6 @@
 module github.com/shoce/tgtubenoti
 
-go 1.22.7
-
-toolchain go1.23.4
+go 1.23.4
 
 require (
 	google.golang.org/api v0.215.0

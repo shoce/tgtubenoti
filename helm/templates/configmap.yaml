@@ -6,16 +6,6 @@ metadata:
 
 data:
 
-  DEBUG: "{{ $.Values.DEBUG }}"
-
   YssUrl: "{{ $.Values.YssUrl }}"
-  YssName: "{{ $.Values.YssName }}"
-
-  TgToken: "{{ $.Values.TgToken }}"
-  TgChatId: "{{ $.Values.TgChatId }}"
-
-  YtKey: "{{ $.Values.YtKey }}"
-  YtChannelId: "{{ $.Values.YtChannelId }}"
-  YtPublishedAfter: "{{ $.Values.YtPublishedAfter }}"
 
 

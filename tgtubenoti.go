@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"sort"
@@ -48,6 +47,8 @@ const (
 )
 
 type TgTubeNotiConfig struct {
+	YssUrl string `yaml:"-"`
+
 	DEBUG bool `yaml:"DEBUG"`
 
 	Interval time.Duration `yaml:"Interval"`
@@ -78,11 +79,6 @@ type TgTubeNotiConfig struct {
 }
 
 var (
-	YssUrl  string
-	YssName string
-
-	YssUrlName string
-
 	Config TgTubeNotiConfig
 
 	HttpClient = &http.Client{}
@@ -134,24 +130,10 @@ func init() {
 	var err error
 
 	if v := os.Getenv("YssUrl"); v != "" {
-		YssUrl = v
+		Config.YssUrl = v
 	}
-	if YssUrl == "" {
+	if Config.YssUrl == "" {
 		log("ERROR YssUrl empty")
-		os.Exit(1)
-	}
-
-	if v := os.Getenv("YssName"); v != "" {
-		YssName = v
-	}
-	if YssName == "" {
-		log("ERROR YssName empty")
-		os.Exit(1)
-	}
-
-	YssUrlName, err = url.JoinPath(YssUrl, YssName)
-	if err != nil {
-		log("ERROR JoinPath %s %s: %s", err)
 		os.Exit(1)
 	}
 
@@ -423,8 +405,7 @@ func log(msg string, args ...interface{}) {
 		"%03d%02d%02d:"+"%02d%02d",
 		t.Year()%1000, t.Month(), t.Day(), t.Hour(), t.Minute(),
 	)
-	msgtext := fmt.Sprintf("%s %s", ts, msg) + NL
-	fmt.Fprintf(os.Stderr, msgtext, args...)
+	fmt.Fprintf(os.Stderr, ts+" "+msg+NL, args...)
 }
 
 func tglog(msg string, args ...interface{}) error {
@@ -477,65 +458,6 @@ func tglog(msg string, args ...interface{}) error {
 	if !smresp.OK {
 		return fmt.Errorf("tglog apiurl:`%s` apidata:`%s` api response not ok: %+v", tgapiurl, smreqjs, smresp)
 	}
-
-	return nil
-}
-
-func (config *TgTubeNotiConfig) Get() error {
-	log("DEBUG Config.Get %s", YssUrlName)
-
-	req, err := http.NewRequest(http.MethodGet, YssUrlName, nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := HttpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("yss response status %s", resp.Status)
-	}
-
-	rbb, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	//log("DEBUG Config.Get: %s", rbb)
-
-	if err := yaml.Unmarshal(rbb, config); err != nil {
-		return err
-	}
-
-	log("DEBUG Config.Get: %+v", config)
-
-	return nil
-}
-
-func (config *TgTubeNotiConfig) Put() error {
-	log("DEBUG Config.Put %s %+v", YssUrlName, config)
-
-	rbb, err := yaml.Marshal(config)
-	if err != nil {
-		return err
-	}
-
-	//log("DEBUG Config.Put %s", string(rbb))
-
-	req, err := http.NewRequest(http.MethodPut, YssUrlName, bytes.NewBuffer(rbb))
-	if err != nil {
-		return err
-	}
-
-	resp, err := HttpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("yss response status %s", resp.Status)
-	}
-	//log("DEBUG Config.Put response status code %s", resp.Status)
 
 	return nil
 }
@@ -901,6 +823,73 @@ func tgpostlivereminder() error {
 	}
 
 	log("posted telegram text message id:%s"+NL, msg.Id)
+
+	return nil
+}
+
+func (config *TgTubeNotiConfig) Get() error {
+	req, err := http.NewRequest(http.MethodGet, config.YssUrl, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("yss response status %s", resp.Status)
+	}
+
+	rbb, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if config.DEBUG {
+		//log("DEBUG Config.Get: %s", string(rbb))
+	}
+
+	if err := yaml.Unmarshal(rbb, config); err != nil {
+		return err
+	}
+
+	if config.DEBUG {
+		log("DEBUG Config.Get: %+v", config)
+	}
+
+	return nil
+}
+
+func (config *TgTubeNotiConfig) Put() error {
+	if config.DEBUG {
+		log("DEBUG Config.Put %s %+v", config.YssUrl, config)
+	}
+
+	rbb, err := yaml.Marshal(config)
+	if err != nil {
+		return err
+	}
+
+	if config.DEBUG {
+		//log("DEBUG Config.Put %s", string(rbb))
+	}
+
+	req, err := http.NewRequest(http.MethodPut, config.YssUrl, bytes.NewBuffer(rbb))
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("yss response status %s", resp.Status)
+	}
+	if config.DEBUG {
+		//log("DEBUG Config.Put response status code %s", resp.Status)
+	}
 
 	return nil
 }

@@ -1,18 +1,8 @@
 ---
 
-DEBUG: false
-
-YssUrl: https://yss
-YssName: tgtubenoti
-
-TgToken: ""
-TgChatId: ""
-
-YtKey: ""
-YtChannelId: ""
-YtPublishedAfter: ""
-
 ImageNameTgTubeNoti: ghcr.io/shoce/tgtubenoti
 ImageTagTgTubeNoti: ""
+
+YssUrl: https://yss/tgtubenoti
 
 
