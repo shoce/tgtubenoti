@@ -846,10 +846,6 @@ func (config *TgTubeNotiConfig) Get() error {
 		return err
 	}
 
-	if config.DEBUG {
-		//log("DEBUG Config.Get: %s", string(rbb))
-	}
-
 	if err := yaml.Unmarshal(rbb, config); err != nil {
 		return err
 	}
@@ -871,10 +867,6 @@ func (config *TgTubeNotiConfig) Put() error {
 		return err
 	}
 
-	if config.DEBUG {
-		//log("DEBUG Config.Put %s", string(rbb))
-	}
-
 	req, err := http.NewRequest(http.MethodPut, config.YssUrl, bytes.NewBuffer(rbb))
 	if err != nil {
 		return err
@@ -886,9 +878,6 @@ func (config *TgTubeNotiConfig) Put() error {
 	}
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("yss response status %s", resp.Status)
-	}
-	if config.DEBUG {
-		//log("DEBUG Config.Put response status code %s", resp.Status)
 	}
 
 	return nil
