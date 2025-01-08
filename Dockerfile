@@ -2,12 +2,12 @@
 # https://hub.docker.com/_/golang/tags
 FROM golang:1.23.4 AS build
 RUN mkdir -p /root/tgtubenoti/
-COPY tgtubenoti.go go.mod go.sum /root/tgtubenoti/
+COPY *.go go.mod go.sum /root/tgtubenoti/
 WORKDIR /root/tgtubenoti/
 RUN go version
 RUN go get -v
 RUN ls -l -a
-RUN go build -o tgtubenoti tgtubenoti.go
+RUN go build -o tgtubenoti .
 RUN ls -l -a
 
 

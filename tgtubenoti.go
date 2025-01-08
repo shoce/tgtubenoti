@@ -142,6 +142,10 @@ func init() {
 		os.Exit(1)
 	}
 
+	if Config.DEBUG {
+		log("DEBUG==true")
+	}
+
 	log("Interval: %v", Config.Interval)
 	if Config.Interval == 0 {
 		log("ERROR Interval empty")
