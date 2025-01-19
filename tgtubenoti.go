@@ -39,11 +39,6 @@ import (
 const (
 	NL   = "\n"
 	SPAC = "    "
-
-	//YtEventType string = "completed"
-	YtEventType string = "upcoming"
-
-	YtMaxResults = 50
 )
 
 type TgTubeNotiConfig struct {
@@ -62,6 +57,9 @@ type TgTubeNotiConfig struct {
 	YtUsername   string `yaml:"YtUsername"`
 	YtChannelId  string `yaml:"YtChannelId"`
 	YtPlaylistId string `yaml:"YtPlaylistId"`
+
+	YtEventType  string `yaml:"YtEventType"`  // = "upcoming" // = "completed"
+	YtMaxResults int64  `yaml:"YtMaxResults"` // = 50
 
 	YtCheckInterval time.Duration `yaml:"YtCheckInterval"`
 	YtCheckLast     time.Time     `yaml:"YtCheckLast"`
@@ -675,7 +673,7 @@ func ytplaylistitemslist(ytplaylistid string, publishedafter string) (ytvideosid
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItem
 
-	playlistitemslistcall := YtSvc.PlaylistItems.List([]string{"snippet", "contentDetails"}).MaxResults(YtMaxResults)
+	playlistitemslistcall := YtSvc.PlaylistItems.List([]string{"snippet", "contentDetails"}).MaxResults(Config.YtMaxResults)
 	playlistitemslistcall = playlistitemslistcall.PlaylistId(ytplaylistid)
 	err = playlistitemslistcall.Pages(
 		context.TODO(),
