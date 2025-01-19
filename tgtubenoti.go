@@ -208,6 +208,11 @@ func init() {
 		log("ERROR YtCheckInterval empty")
 		os.Exit(1)
 	}
+
+	if Config.YtMaxResults == 0 {
+		log("ERROR YtMaxResults empty")
+		os.Exit(1)
+	}
 }
 
 func main() {
