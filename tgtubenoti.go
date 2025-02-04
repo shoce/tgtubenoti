@@ -85,41 +85,49 @@ var (
 
 	TgTimezone *time.Location
 
+	// TODO TgLangMessages in Config
 	TgLangMessages = map[string]map[string]string{
 		"deutsch": map[string]string{
 			"published":    "Neues Video",
 			"nextlive":     "Bevorstehender Livestream",
 			"livereminder": "Der Livestream beginnt in einer Stunde",
+			"months":       "januar februar märz april mai juni juli august september oktober november dezember",
 		},
 		"english": map[string]string{
 			"published":    "New video",
 			"nextlive":     "Upcoming live",
 			"livereminder": "Live starts in one hour",
+			"months":       "january february march april may june july august september october november december",
 		},
 		"french": map[string]string{
 			"published":    "Nouveau vidéo",
 			"nextlive":     "Prochain live",
 			"livereminder": "Le live commence dans une heure",
+			"months":       "janvier février mars avril mai juin juillet aout septembre octobre novembre décembre",
 		},
 		"hindi": map[string]string{
 			"published":    "नया वीडियो",
 			"nextlive":     "आगामी लाइव",
 			"livereminder": "लाइव एक घंटे में शुरू होगा",
+			"months":       "जनवरी फरवरी मार्च अप्रैल मई जून जुलाई अगस्त सितम्बर अक्टूबर नवम्बर दिसम्बर",
 		},
 		"russian": map[string]string{
 			"published":    "Новое видео",
 			"nextlive":     "Запланированный эфир",
 			"livereminder": "Через час начало эфира",
+			"months":       "январь февраль март апрель май июнь июль август сентябрь октябрь ноябрь декабрь",
 		},
 		"spanish": map[string]string{
 			"published":    "Nuevo video",
 			"nextlive":     "Próximo en vivo",
 			"livereminder": "El directo comienza en una hora",
+			"months":       "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre",
 		},
 		"ukrainian": map[string]string{
 			"published":    "Нове відео",
 			"nextlive":     "Запланований ефір",
 			"livereminder": "Через годину початок ефіру",
+			"months":       "січень лютий березень квітень травень червень липень серпень вересень жовтень листопад грудень",
 		},
 	}
 )
@@ -373,7 +381,7 @@ func CheckTube() (err error) {
 
 			// live
 
-			if v, err := time.Parse(v.LiveStreamingDetails.ScheduledStartTime, time.RFC3339); err == nil {
+			if v, err := time.Parse(time.RFC3339, v.LiveStreamingDetails.ScheduledStartTime); err == nil {
 				Config.YtNextLive = v
 			} else {
 				log("ERROR parse LiveStreamingDetails.ScheduledStartTime: %s", err)
@@ -467,36 +475,6 @@ func tglog(msg string, args ...interface{}) error {
 	}
 
 	return nil
-}
-
-func monthnameru(m time.Month) string {
-	switch m {
-	case time.January:
-		return "январь"
-	case time.February:
-		return "февраль"
-	case time.March:
-		return "март"
-	case time.April:
-		return "апрель"
-	case time.May:
-		return "май"
-	case time.June:
-		return "июнь"
-	case time.July:
-		return "июль"
-	case time.August:
-		return "август"
-	case time.September:
-		return "сентябрь"
-	case time.October:
-		return "октябрь"
-	case time.November:
-		return "ноябрь"
-	case time.December:
-		return "декабрь"
-	}
-	return "янвабрь"
 }
 
 func httpPostJson(url string, data *bytes.Buffer, target interface{}) error {
@@ -788,7 +766,7 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 			"*%s/%d %s* (%s) "+NL+
 			"https://youtu.be/%s "+NL,
 		tgEscape(Config.YtNextLiveTitle),
-		strings.ToTitle(monthnameru(Config.YtNextLive.In(TgTimezone).Month())),
+		strings.ToTitle(strings.Fields(TgLangMessages[Config.TgLang]["months"])[Config.YtNextLive.In(TgTimezone).Month()-1]),
 		Config.YtNextLive.In(TgTimezone).Day(),
 		Config.YtNextLive.In(TgTimezone).Format("15:04"),
 		Config.TgTimezoneNameShort,
