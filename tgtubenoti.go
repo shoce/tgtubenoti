@@ -385,6 +385,7 @@ func CheckTube() (err error) {
 				Config.YtNextLive = v
 			} else {
 				log("ERROR parse LiveStreamingDetails.ScheduledStartTime: %s", err)
+				return fmt.Errorf("telegram post next live time.Parse ScheduledStartTime: %w", err)
 			}
 			Config.YtNextLiveId = v.Id
 			Config.YtNextLiveTitle = v.Snippet.Title
