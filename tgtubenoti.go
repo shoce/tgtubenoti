@@ -79,6 +79,8 @@ type TgTubeNotiConfig struct {
 var (
 	Config TgTubeNotiConfig
 
+	LogTimeZone string
+
 	HttpClient = &http.Client{}
 
 	YtSvc *youtube.Service
@@ -134,6 +136,9 @@ var (
 
 func init() {
 	var err error
+
+	LogTimeZone = time.Now().Local().Format("-0700")
+	LogTimeZone = strings.TrimRight(LogTimeZone, "0")
 
 	if v := os.Getenv("YssUrl"); v != "" {
 		Config.YssUrl = v
@@ -415,13 +420,17 @@ func CheckTube() (err error) {
 	return nil
 }
 
-func log(msg string, args ...interface{}) {
-	t := time.Now().Local()
-	ts := fmt.Sprintf(
-		"%03d%02d%02d:"+"%02d%02d",
-		t.Year()%1000, t.Month(), t.Day(), t.Hour(), t.Minute(),
+func ts() string {
+	tnow := time.Now().Local()
+	return fmt.Sprintf(
+		"%d%02d%02d:%02d%02d%s",
+		tnow.Year()%1000, tnow.Month(), tnow.Day(),
+		tnow.Hour(), tnow.Minute(), LogTimeZone,
 	)
-	fmt.Fprintf(os.Stderr, ts+" "+msg+NL, args...)
+}
+
+func log(msg string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, ts()+" "+msg+NL, args...)
 }
 
 func tglog(msg string, args ...interface{}) error {
