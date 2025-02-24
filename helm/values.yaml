@@ -1,7 +1,7 @@
 ---
 
-ImageNameTgTubeNoti: ghcr.io/shoce/tgtubenoti
-ImageTagTgTubeNoti: ""
+ImageNameGithubTgTubeNoti: ghcr.io/shoce/tgtubenoti
+ImageTagGithubTgTubeNoti: ""
 
 YssUrl: https://yss/tgtubenoti
 

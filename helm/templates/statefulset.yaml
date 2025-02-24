@@ -4,6 +4,7 @@ kind: StatefulSet
 
 metadata:
   name: {{ $.Release.Name }}-tgtubenoti
+  namespace: { $.Release.Namespace }}
   labels:
     app: {{ $.Release.Name }}-tgtubenoti
 
@@ -26,7 +27,7 @@ spec:
       containers:
 
         - name: {{ $.Release.Name }}-tgtubenoti
-          image: "{{ $.Values.ImageNameTgTubeNoti }}:{{ $.Values.ImageTagTgTubeNoti }}"
+          image: "{{ $.Values.ImageNameGithubTgTubeNoti }}:{{ $.Values.ImageTagGithubTgTubeNoti }}"
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
