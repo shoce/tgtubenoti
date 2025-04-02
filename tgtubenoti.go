@@ -564,13 +564,14 @@ func tgEscape(s string) string {
 func tgSendPhoto(chatid, photourl, caption string) (msg *TgMessage, err error) {
 	// https://core.telegram.org/bots/api#sendphoto
 
-	caption = tgEscapeMarkdown(caption)
-
 	sendphoto := map[string]interface{}{
 		"chat_id":    chatid,
 		"photo":      photourl,
-		"caption":    caption,
+		"caption":    tgEscapeMarkdown(caption),
 		"parse_mode": "MarkdownV2",
+	}
+	if Config.DEBUG {
+		log("DEBUG sendphoto==%+v", sendphoto)
 	}
 	sendphotojson, err := json.Marshal(sendphoto)
 	if err != nil {
@@ -588,7 +589,7 @@ func tgSendPhoto(chatid, photourl, caption string) (msg *TgMessage, err error) {
 	}
 
 	if !tgresp.Ok {
-		return nil, fmt.Errorf("tgSendPhoto: %s", tgresp.Description)
+		return nil, fmt.Errorf("sendPhoto response not ok: %s", tgresp.Description)
 	}
 
 	msg = tgresp.Result
