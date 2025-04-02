@@ -184,7 +184,7 @@ func init() {
 	}
 	TgTimezone, err = time.LoadLocation(Config.TgTimezoneName)
 	if err != nil {
-		tglog("ERROR time.LoadLocation `%s`: %w", Config.TgTimezoneName, err)
+		tglog("ERROR time.LoadLocation `%s`: %v", Config.TgTimezoneName, err)
 		os.Exit(1)
 	}
 	log("DEBUG TgTimezoneName: %s", Config.TgTimezoneName)
@@ -299,13 +299,13 @@ func CheckTube() (err error) {
 
 	YtSvc, err = youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(Config.YtKey))
 	if err != nil {
-		tglog("ERROR youtube.NewService: %w", err)
+		tglog("ERROR youtube.NewService: %v", err)
 		return fmt.Errorf("youtube.NewService: %w", err)
 	}
 
 	Config.YtPlaylistId, err = ytgetplaylistid(Config.YtUsername, Config.YtChannelId)
 	if err != nil {
-		tglog("ERROR get youtube playlist id: %w", err)
+		tglog("ERROR get youtube playlist id: %v", err)
 		return fmt.Errorf("get youtube playlist id: %w", err)
 	}
 	if Config.YtPlaylistId == "" {
@@ -322,14 +322,14 @@ func CheckTube() (err error) {
 	var ytvideosids []string
 	ytvideosids, err = ytplaylistitemslist(Config.YtPlaylistId, Config.YtLastPublishedAt)
 	if err != nil {
-		tglog("WARNING youtube list published: %w", err)
+		tglog("WARNING youtube list published: %v", err)
 	}
 
 	var ytvideos []youtube.Video
 	if len(ytvideosids) > 0 {
 		ytvideos, err = ytvideoslist(ytvideosids)
 		if err != nil {
-			tglog("WARNING youtube list published: %s", err)
+			tglog("WARNING youtube list published: %v", err)
 		}
 	}
 
@@ -367,7 +367,7 @@ func CheckTube() (err error) {
 
 			err = tgpostpublished(v)
 			if err != nil {
-				tglog("ERROR telegram post published youtube video: %w", err)
+				tglog("ERROR telegram post published youtube video: %v", err)
 				return fmt.Errorf("telegram post published youtube video: %w", err)
 			}
 
@@ -403,7 +403,7 @@ func CheckTube() (err error) {
 
 			err = tgpostnextlive(v)
 			if err != nil {
-				tglog("telegram post next live: %w", err)
+				tglog("telegram post next live: %v", err)
 				return fmt.Errorf("telegram post next live: %w", err)
 			}
 
