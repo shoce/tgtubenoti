@@ -336,13 +336,10 @@ func CheckTube() (err error) {
 	if Config.DEBUG {
 		for j, v := range ytvideos {
 			tglog(
-				"DEBUG "+NL+"%d/%d "+NL+"«%s» "+NL+"youtu.be/%s "+NL+"%s "+NL+"liveStreamingDetails:%+v ",
-				j+1,
-				len(ytvideos),
-				v.Snippet.Title,
-				v.Id,
-				v.Snippet.PublishedAt,
-				v.LiveStreamingDetails,
+				"DEBUG "+NL+"%d/%d "+"«%s» "+"youtu.be/%s "+NL+
+					"%s "+"liveStreamingDetails==%+v ",
+				j+1, len(ytvideos), v.Snippet.Title, v.Id,
+				v.Snippet.PublishedAt, v.LiveStreamingDetails,
 			)
 		}
 	}
@@ -571,6 +568,7 @@ func tgSendPhoto(chatid, photourl, caption string) (msg *TgMessage, err error) {
 		"parse_mode": "MarkdownV2",
 	}
 	if Config.DEBUG {
+		log("DEBUG photourl==%+v", photourl)
 		log("DEBUG sendphoto==%+v", sendphoto)
 	}
 	sendphotojson, err := json.Marshal(sendphoto)
@@ -734,7 +732,7 @@ func tgpostpublished(ytvideo youtube.Video) error {
 	}
 
 	if Config.DEBUG {
-		log("DEBUG photourl: %s"+NL, photourl)
+		tglog("DEBUG tgpostpublished photourl==%s"+NL, photourl)
 	}
 
 	caption := fmt.Sprintf(
@@ -768,7 +766,7 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 	}
 
 	if Config.DEBUG {
-		log("DEBUG tgpostnextlive photourl: %s"+NL, photourl)
+		tglog("DEBUG tgpostnextlive photourl==%s"+NL, photourl)
 	}
 
 	caption := fmt.Sprintf(
