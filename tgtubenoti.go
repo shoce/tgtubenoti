@@ -338,8 +338,8 @@ func CheckTube() (err error) {
 	if Config.DEBUG {
 		for j, v := range ytvideos {
 			tglog(
-				"DEBUG "+NL+"%d/%d "+"«%s» "+"youtu.be/%s "+NL+
-					"%s "+"liveStreamingDetails==%+v ",
+				"DEBUG "+NL+"%d/%d "+"«%s» "+NL+
+					"youtu.be/%s "+"%s "+"liveStreamingDetails==%+v ",
 				j+1, len(ytvideos), v.Snippet.Title, v.Id,
 				v.Snippet.PublishedAt, v.LiveStreamingDetails,
 			)
