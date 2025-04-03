@@ -39,6 +39,8 @@ import (
 const (
 	NL   = "\n"
 	SPAC = "    "
+
+	TgParseMode = "MarkdownV2"
 )
 
 type TgTubeNotiConfig struct {
@@ -426,64 +428,6 @@ func ts() string {
 	)
 }
 
-func log(msg string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, ts()+" "+msg+NL, args...)
-}
-
-func tglog(msg string, args ...interface{}) error {
-	log(msg, args...)
-	msgtext := fmt.Sprintf(msg, args...) + NL
-
-	type TgSendMessageRequest struct {
-		ChatId              string `json:"chat_id"`
-		Text                string `json:"text"`
-		ParseMode           string `json:"parse_mode,omitempty"`
-		DisableNotification bool   `json:"disable_notification"`
-	}
-
-	type TgSendMessageResponse struct {
-		OK          bool   `json:"ok"`
-		Description string `json:"description"`
-		Result      struct {
-			MessageId int64 `json:"message_id"`
-		} `json:"result"`
-	}
-
-	smreq := TgSendMessageRequest{
-		ChatId:              Config.TgBossChatId,
-		Text:                msgtext,
-		ParseMode:           "",
-		DisableNotification: true,
-	}
-	smreqjs, err := json.Marshal(smreq)
-	if err != nil {
-		return fmt.Errorf("tglog json marshal: %w", err)
-	}
-	smreqjsBuffer := bytes.NewBuffer(smreqjs)
-
-	var resp *http.Response
-	tgapiurl := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", Config.TgToken)
-	resp, err = http.Post(
-		tgapiurl,
-		"application/json",
-		smreqjsBuffer,
-	)
-	if err != nil {
-		return fmt.Errorf("tglog apiurl:`%s` apidata:`%s`: %w", tgapiurl, smreqjs, err)
-	}
-
-	var smresp TgSendMessageResponse
-	err = json.NewDecoder(resp.Body).Decode(&smresp)
-	if err != nil {
-		return fmt.Errorf("tglog decode response: %w", err)
-	}
-	if !smresp.OK {
-		return fmt.Errorf("tglog apiurl:`%s` apidata:`%s` api response not ok: %+v", tgapiurl, smreqjs, smresp)
-	}
-
-	return nil
-}
-
 func httpPostJson(url string, data *bytes.Buffer, target interface{}) error {
 	resp, err := HttpClient.Post(
 		url,
@@ -529,47 +473,56 @@ type TgResponse struct {
 	Result      *TgMessage `json:"result"`
 }
 
-func tgEscapeMarkdown(text string) string {
-	return strings.NewReplacer(
-		"(", "\\(",
-		")", "\\)",
-		"[", "\\[",
-		"]", "\\]",
-		"{", "\\{",
-		"}", "\\}",
-		"~", "\\~",
-		">", "\\>",
-		"#", "\\#",
-		"+", "\\+",
-		"-", "\\-",
-		"=", "\\=",
-		"|", "\\|",
-		"!", "\\!",
-		".", "\\.",
-	).Replace(text)
+func tgesc(text string) string {
+	for _, c := range "\\_*[]()~`>#+-=|{}.!" {
+		text = strings.ReplaceAll(text, string(c), "\\"+string(c))
+	}
+	return text
 }
 
-func tgEscape(s string) string {
-	return strings.NewReplacer(
-		"_", "\\_",
-		"*", "\\*",
-		"~", "\\~",
-		"`", "\\`",
-	).Replace(s)
+func tgbold(text string) string {
+	return "*" + tgesc(text) + "*"
+}
+
+type TgLinkPreviewOptions struct {
+	IsDisabled bool `json:"is_disabled"`
+}
+
+type TgSendMessageRequest struct {
+	ChatId    string `json:"chat_id"`
+	Text      string `json:"text"`
+	ParseMode string `json:"parse_mode,omitempty"`
+
+	DisableNotification bool                 `json:"disable_notification,omitempty"`
+	LinkPreviewOptions  TgLinkPreviewOptions `json:"link_preview_options,omitempty"`
+}
+
+type TgSendMessageResponse struct {
+	OK          bool   `json:"ok"`
+	Description string `json:"description"`
+	Result      struct {
+		MessageId int64 `json:"message_id"`
+	} `json:"result"`
+}
+
+type TgSendPhotoRequest struct {
+	ChatId    string `json:"chat_id"`
+	Photo     string `json:"photo"`
+	Caption   string `json:"caption"`
+	ParseMode string `json:"parse_mode"`
 }
 
 func tgSendPhoto(chatid, photourl, caption string) (msg *TgMessage, err error) {
 	// https://core.telegram.org/bots/api#sendphoto
 
-	sendphoto := map[string]interface{}{
-		"chat_id":    chatid,
-		"photo":      photourl,
-		"caption":    tgEscapeMarkdown(caption),
-		"parse_mode": "MarkdownV2",
+	sendphoto := TgSendPhotoRequest{
+		ChatId:    chatid,
+		Photo:     photourl,
+		Caption:   tgesc(caption),
+		ParseMode: TgParseMode,
 	}
 	if Config.DEBUG {
-		log("DEBUG photourl==%+v", photourl)
-		log("DEBUG sendphoto==%+v", sendphoto)
+		log("DEBUG sendphoto==%#v", sendphoto)
 	}
 	sendphotojson, err := json.Marshal(sendphoto)
 	if err != nil {
@@ -599,14 +552,15 @@ func tgSendPhoto(chatid, photourl, caption string) (msg *TgMessage, err error) {
 func tgSendMessage(chatid, text string) (msg *TgMessage, err error) {
 	// https://core.telegram.org/bots/api#sendmessage
 
-	text = tgEscapeMarkdown(text)
+	sendmessage := TgSendMessageRequest{
+		ChatId:    chatid,
+		Text:      tgesc(text),
+		ParseMode: TgParseMode,
 
-	sendmessage := map[string]interface{}{
-		"chat_id":    chatid,
-		"text":       text,
-		"parse_mode": "MarkdownV2",
-
-		"disable_web_page_preview": true,
+		LinkPreviewOptions: TgLinkPreviewOptions{IsDisabled: true},
+	}
+	if Config.DEBUG {
+		log("DEBUG sendmessage==%#v", sendmessage)
 	}
 	sendmessagejson, err := json.Marshal(sendmessage)
 	if err != nil {
@@ -731,28 +685,15 @@ func tgpostpublished(ytvideo youtube.Video) error {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	if Config.DEBUG {
-		tglog("DEBUG tgpostpublished photourl==%s"+NL, photourl)
-	}
+	caption := (tgesc(TgLangMessages[Config.TgLang]["published"]) + " " + NL +
+		tgbold(ytvideo.Snippet.Title) + NL +
+		tgesc(fmt.Sprintf("https://youtu.be/%s", ytvideo.Id)) + " " + NL +
+		"")
 
-	caption := fmt.Sprintf(
-		TgLangMessages[Config.TgLang]["published"]+" "+NL+
-			"*%s* "+NL+
-			"https://youtu.be/%s "+NL,
-		tgEscape(ytvideo.Snippet.Title),
-		tgEscape(ytvideo.Id),
-	)
-
-	if Config.DEBUG {
-		log("DEBUG tgpostpublished photo caption: "+NL+"%s"+NL, caption)
-	}
-
-	msg, err := tgSendPhoto(Config.TgChatId, photourl, caption)
+	_, err := tgSendPhoto(Config.TgChatId, photourl, caption)
 	if err != nil {
 		return fmt.Errorf("telegram send photo: %w", err)
 	}
-
-	log("posted telegram photo message id:%s"+NL, msg.Id)
 
 	return nil
 }
@@ -765,33 +706,21 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	if Config.DEBUG {
-		tglog("DEBUG tgpostnextlive photourl==%s"+NL, photourl)
-	}
+	caption := (tgesc(TgLangMessages[Config.TgLang]["nextlive"]) + " " + NL +
+		tgbold(Config.YtNextLiveTitle) + " " + NL +
+		tgbold(fmt.Sprintf("%s/%d %s",
+			strings.ToTitle(strings.Fields(TgLangMessages[Config.TgLang]["months"])[Config.YtNextLive.In(TgTimezone).Month()-1]),
+			Config.YtNextLive.In(TgTimezone).Day(),
+			Config.YtNextLive.In(TgTimezone).Format("15:04")),
+		) + " " +
+		tgesc(fmt.Sprintf("(%s)", Config.TgTimezoneNameShort)) + " " + NL +
+		tgesc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + " " + NL +
+		"")
 
-	caption := fmt.Sprintf(
-		TgLangMessages[Config.TgLang]["nextlive"]+" "+NL+
-			"*%s* "+NL+
-			"*%s/%d %s* (%s) "+NL+
-			"https://youtu.be/%s "+NL,
-		tgEscape(Config.YtNextLiveTitle),
-		strings.ToTitle(strings.Fields(TgLangMessages[Config.TgLang]["months"])[Config.YtNextLive.In(TgTimezone).Month()-1]),
-		Config.YtNextLive.In(TgTimezone).Day(),
-		Config.YtNextLive.In(TgTimezone).Format("15:04"),
-		Config.TgTimezoneNameShort,
-		tgEscape(Config.YtNextLiveId),
-	)
-
-	if Config.DEBUG {
-		log("DEBUG tgpostnextlive photo caption: "+NL+"%s"+NL, caption)
-	}
-
-	msg, err := tgSendPhoto(Config.TgChatId, photourl, caption)
+	_, err = tgSendPhoto(Config.TgChatId, photourl, caption)
 	if err != nil {
 		return fmt.Errorf("telegram send photo: %w", err)
 	}
-
-	log("posted telegram photo message id:%s"+NL, msg.Id)
 
 	return nil
 }
@@ -799,13 +728,10 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 func tgpostlivereminder() error {
 	var err error
 
-	text := fmt.Sprintf(
-		TgLangMessages[Config.TgLang]["livereminder"]+" "+NL+
-			"*%s* "+NL+
-			"https://youtu.be/%s "+NL,
-		tgEscape(Config.YtNextLiveTitle),
-		tgEscape(Config.YtNextLiveId),
-	)
+	text := (tgesc(TgLangMessages[Config.TgLang]["livereminder"]) + " " + NL +
+		tgbold(Config.YtNextLiveTitle) + " " + NL +
+		tgesc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + " " + NL +
+		"")
 
 	if Config.DEBUG {
 		log("DEBUG tgpostlivereminder text: "+NL+"%s"+NL, text)
@@ -817,6 +743,50 @@ func tgpostlivereminder() error {
 	}
 
 	log("posted telegram text message id:%s"+NL, msg.Id)
+
+	return nil
+}
+
+func log(msg string, args ...interface{}) {
+	fmt.Fprintf(os.Stderr, ts()+" "+msg+NL, args...)
+}
+
+func tglog(msg string, args ...interface{}) error {
+	log(msg, args...)
+	msgtext := fmt.Sprintf(msg, args...) + NL
+
+	smreq := TgSendMessageRequest{
+		ChatId:    Config.TgBossChatId,
+		Text:      tgesc(msgtext),
+		ParseMode: TgParseMode,
+
+		DisableNotification: true,
+	}
+	smreqjs, err := json.Marshal(smreq)
+	if err != nil {
+		return fmt.Errorf("tglog json marshal: %w", err)
+	}
+	smreqjsBuffer := bytes.NewBuffer(smreqjs)
+
+	var resp *http.Response
+	tgapiurl := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", Config.TgToken)
+	resp, err = http.Post(
+		tgapiurl,
+		"application/json",
+		smreqjsBuffer,
+	)
+	if err != nil {
+		return fmt.Errorf("tglog apiurl:`%s` apidata:`%s`: %w", tgapiurl, smreqjs, err)
+	}
+
+	var smresp TgSendMessageResponse
+	err = json.NewDecoder(resp.Body).Decode(&smresp)
+	if err != nil {
+		return fmt.Errorf("tglog decode response: %w", err)
+	}
+	if !smresp.OK {
+		return fmt.Errorf("tglog apiurl:`%s` apidata:`%s` api response not ok: %+v", tgapiurl, smreqjs, smresp)
+	}
 
 	return nil
 }
