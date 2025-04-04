@@ -559,7 +559,7 @@ func tgSendMessage(chatid, text string) (msg *TgMessage, err error) {
 
 	sendmessage := TgSendMessageRequest{
 		ChatId:    chatid,
-		Text:      tgesc(text),
+		Text:      text,
 		ParseMode: TgParseMode,
 
 		LinkPreviewOptions: TgLinkPreviewOptions{IsDisabled: true},
@@ -690,10 +690,9 @@ func tgpostpublished(ytvideo youtube.Video) error {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	caption := (tgesc(TgLangMessages[Config.TgLang]["published"]) + " " + NL +
+	caption := tgesc(TgLangMessages[Config.TgLang]["published"]) + " " + NL +
 		tgbold(ytvideo.Snippet.Title) + NL +
-		tgesc(fmt.Sprintf("https://youtu.be/%s", ytvideo.Id)) + " " + NL +
-		"")
+		tgesc(fmt.Sprintf("https://youtu.be/%s", ytvideo.Id)) + " " + NL
 
 	_, err := tgSendPhoto(Config.TgChatId, photourl, caption)
 	if err != nil {
@@ -711,7 +710,7 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	caption := (tgesc(TgLangMessages[Config.TgLang]["nextlive"]) + " " + NL +
+	caption := tgesc(TgLangMessages[Config.TgLang]["nextlive"]) + " " + NL +
 		tgbold(Config.YtNextLiveTitle) + " " + NL +
 		tgbold(fmt.Sprintf("%s/%d %s",
 			strings.ToTitle(strings.Fields(TgLangMessages[Config.TgLang]["months"])[Config.YtNextLive.In(TgTimezone).Month()-1]),
@@ -719,8 +718,7 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 			Config.YtNextLive.In(TgTimezone).Format("15:04")),
 		) + " " +
 		tgesc(fmt.Sprintf("(%s)", Config.TgTimezoneNameShort)) + " " + NL +
-		tgesc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + " " + NL +
-		"")
+		tgesc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + " " + NL
 
 	_, err = tgSendPhoto(Config.TgChatId, photourl, caption)
 	if err != nil {
@@ -733,10 +731,9 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 func tgpostlivereminder() error {
 	var err error
 
-	text := (tgesc(TgLangMessages[Config.TgLang]["livereminder"]) + " " + NL +
+	text := tgesc(TgLangMessages[Config.TgLang]["livereminder"]) + " " + NL +
 		tgbold(Config.YtNextLiveTitle) + " " + NL +
-		tgesc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + " " + NL +
-		"")
+		tgesc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + " " + NL
 
 	if Config.DEBUG {
 		log("DEBUG tgpostlivereminder text: "+NL+"%s"+NL, text)
@@ -766,6 +763,7 @@ func tglog(msg string, args ...interface{}) error {
 		ParseMode: TgParseMode,
 
 		DisableNotification: true,
+		LinkPreviewOptions:  TgLinkPreviewOptions{IsDisabled: true},
 	}
 	smreqjs, err := json.Marshal(smreq)
 	if err != nil {
