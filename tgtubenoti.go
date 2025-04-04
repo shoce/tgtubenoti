@@ -2,12 +2,10 @@
 
 https://console.cloud.google.com/apis/credentials
 https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas
-
-        # every search requests costs 100 quota
-        # total quota limit is 10'000 per day
-        # twice an hour schedule uses 4800 quota per day
-        # trice an hour schedule uses 7200 quota per day
-
+# every search requests costs 100 quota
+# total quota limit is 10'000 per day
+# twice an hour schedule uses 4800 quota per day
+# trice an hour schedule uses 7200 quota per day
 
 GoGet
 GoFmt
@@ -96,42 +94,49 @@ var (
 			"nextlive":     "Bevorstehender Livestream",
 			"livereminder": "Der Livestream beginnt in einer Stunde",
 			"months":       "januar februar märz april mai juni juli august september oktober november dezember",
+			"today":        "heute",
 		},
 		"english": map[string]string{
 			"published":    "New video",
 			"nextlive":     "Upcoming live",
 			"livereminder": "Live starts in one hour",
 			"months":       "january february march april may june july august september october november december",
+			"today":        "today",
 		},
 		"french": map[string]string{
 			"published":    "Nouveau vidéo",
 			"nextlive":     "Prochain live",
 			"livereminder": "Le live commence dans une heure",
 			"months":       "janvier février mars avril mai juin juillet aout septembre octobre novembre décembre",
+			"today":        "aujourd'hui",
 		},
 		"hindi": map[string]string{
 			"published":    "नया वीडियो",
 			"nextlive":     "आगामी लाइव",
 			"livereminder": "लाइव एक घंटे में शुरू होगा",
 			"months":       "जनवरी फरवरी मार्च अप्रैल मई जून जुलाई अगस्त सितम्बर अक्टूबर नवम्बर दिसम्बर",
+			"today":        "आज",
 		},
 		"russian": map[string]string{
 			"published":    "Новое видео",
 			"nextlive":     "Запланированный эфир",
 			"livereminder": "Через час начало эфира",
 			"months":       "январь февраль март апрель май июнь июль август сентябрь октябрь ноябрь декабрь",
+			"today":        "сегодня",
 		},
 		"spanish": map[string]string{
 			"published":    "Nuevo video",
 			"nextlive":     "Próximo en vivo",
 			"livereminder": "El directo comienza en una hora",
 			"months":       "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre",
+			"today":        "hoy",
 		},
 		"ukrainian": map[string]string{
 			"published":    "Нове відео",
 			"nextlive":     "Запланований ефір",
 			"livereminder": "Через годину початок ефіру",
 			"months":       "січень лютий березень квітень травень червень липень серпень вересень жовтень листопад грудень",
+			"today":        "сьогодні",
 		},
 	}
 )
@@ -338,7 +343,7 @@ func CheckTube() (err error) {
 	if Config.DEBUG {
 		for j, v := range ytvideos {
 			tglog(
-				"DEBUG "+NL+"%d/%d "+"«%s» "+NL+
+				"DEBUG "+NL+"%d/%d "+"%s "+NL+
 					"youtu.be/%s "+"%s "+"liveStreamingDetails==%+v ",
 				j+1, len(ytvideos), v.Snippet.Title, v.Id,
 				v.Snippet.PublishedAt, v.LiveStreamingDetails,
