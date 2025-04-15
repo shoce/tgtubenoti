@@ -18,7 +18,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,13 +31,13 @@ import (
 	youtubeoption "google.golang.org/api/option"
 	youtube "google.golang.org/api/youtube/v3"
 	yaml "gopkg.in/yaml.v3"
+
+	"github.com/shoce/tg"
 )
 
 const (
 	NL   = "\n"
 	SPAC = "    "
-
-	TgParseMode = "MarkdownV2"
 )
 
 type TgTubeNotiConfig struct {
@@ -252,7 +251,7 @@ func main() {
 
 		err = CheckTube()
 		if err != nil {
-			log("WARNING CheckTube: %v", err)
+			tglog("ERROR CheckTube: %v", err)
 		}
 
 		if dur := time.Now().Sub(t0); dur < Config.Interval {
@@ -306,17 +305,14 @@ func CheckTube() (err error) {
 
 	YtSvc, err = youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(Config.YtKey))
 	if err != nil {
-		tglog("ERROR youtube.NewService: %v", err)
 		return fmt.Errorf("youtube.NewService: %w", err)
 	}
 
 	Config.YtPlaylistId, err = ytgetplaylistid(Config.YtUsername, Config.YtChannelId)
 	if err != nil {
-		tglog("ERROR get youtube playlist id: %v", err)
 		return fmt.Errorf("get youtube playlist id: %w", err)
 	}
 	if Config.YtPlaylistId == "" {
-		tglog("ERROR YtPlaylistId empty")
 		return fmt.Errorf("YtPlaylistId empty")
 	}
 
@@ -329,22 +325,22 @@ func CheckTube() (err error) {
 	var ytvideosids []string
 	ytvideosids, err = ytplaylistitemslist(Config.YtPlaylistId, Config.YtLastPublishedAt)
 	if err != nil {
-		tglog("WARNING youtube list published: %v", err)
+		return fmt.Errorf("youtube playlist items list: %v", err)
 	}
 
 	var ytvideos []youtube.Video
 	if len(ytvideosids) > 0 {
 		ytvideos, err = ytvideoslist(ytvideosids)
 		if err != nil {
-			tglog("WARNING youtube list published: %v", err)
+			return fmt.Errorf("youtube videos list: %v", err)
 		}
 	}
 
 	if Config.DEBUG {
 		for j, v := range ytvideos {
 			tglog(
-				"DEBUG "+NL+"%d/%d "+"%s "+NL+
-					"youtu.be/%s "+"%s "+"liveStreamingDetails==%+v ",
+				"DEBUG"+NL+"%d/%d"+" "+"%s"+NL+
+					"youtu.be/%s"+" "+"%s"+NL+"liveStreamingDetails==%+v",
 				j+1, len(ytvideos), v.Snippet.Title, v.Id,
 				v.Snippet.PublishedAt, v.LiveStreamingDetails,
 			)
@@ -356,7 +352,7 @@ func CheckTube() (err error) {
 		if v.Snippet.PublishedAt <= Config.YtLastPublishedAt {
 
 			// skip
-			tglog("skipping video: %s %s<=%s", v.Id, v.Snippet.PublishedAt, Config.YtLastPublishedAt)
+			tglog("skipping video %s %s", v.Id, v.Snippet.PublishedAt)
 
 			Config.YtLastPublishedAt = v.Snippet.PublishedAt
 
@@ -371,7 +367,6 @@ func CheckTube() (err error) {
 
 			err = tgpostpublished(v)
 			if err != nil {
-				tglog("ERROR telegram post published youtube video: %v", err)
 				return fmt.Errorf("telegram post published youtube video: %w", err)
 			}
 
@@ -393,7 +388,6 @@ func CheckTube() (err error) {
 			if v, err := time.Parse(time.RFC3339, v.LiveStreamingDetails.ScheduledStartTime); err == nil {
 				Config.YtNextLive = v
 			} else {
-				log("ERROR parse LiveStreamingDetails.ScheduledStartTime: %s", err)
 				return fmt.Errorf("telegram post next live time.Parse ScheduledStartTime: %w", err)
 			}
 			Config.YtNextLiveId = v.Id
@@ -407,7 +401,6 @@ func CheckTube() (err error) {
 
 			err = tgpostnextlive(v)
 			if err != nil {
-				tglog("telegram post next live: %v", err)
 				return fmt.Errorf("telegram post next live: %w", err)
 			}
 
@@ -422,174 +415,6 @@ func CheckTube() (err error) {
 	}
 
 	return nil
-}
-
-func ts() string {
-	tnow := time.Now().Local()
-	return fmt.Sprintf(
-		"%d%02d%02d:%02d%02d%s",
-		tnow.Year()%1000, tnow.Month(), tnow.Day(),
-		tnow.Hour(), tnow.Minute(), LogTimeZone,
-	)
-}
-
-func httpPostJson(url string, data *bytes.Buffer, target interface{}) error {
-	resp, err := HttpClient.Post(
-		url,
-		"application/json",
-		data,
-	)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	respBody := bytes.NewBuffer(nil)
-	_, err = io.Copy(respBody, resp.Body)
-	if err != nil {
-		return fmt.Errorf("io.Copy: %v", err)
-	}
-
-	err = json.NewDecoder(respBody).Decode(target)
-	if err != nil {
-		return fmt.Errorf("json.Decode: %v", err)
-	}
-
-	return nil
-}
-
-type TgPhotoSize struct {
-	FileId       string `json:"file_id"`
-	FileUniqueId string `json:"file_unique_id"`
-	Width        int64  `json:"width"`
-	Height       int64  `json:"height"`
-	FileSize     int64  `json:"file_size"`
-}
-
-type TgMessage struct {
-	Id        string
-	MessageId int64         `json:"message_id"`
-	Photo     []TgPhotoSize `json:"photo"`
-}
-
-type TgResponse struct {
-	Ok          bool       `json:"ok"`
-	Description string     `json:"description"`
-	Result      *TgMessage `json:"result"`
-}
-
-func tgesc(text string) string {
-	for _, c := range "\\_*[]()~`>#+-=|{}.!" {
-		text = strings.ReplaceAll(text, string(c), "\\"+string(c))
-	}
-	return text
-}
-
-func tgbold(text string) string {
-	return "*" + tgesc(text) + "*"
-}
-
-type TgLinkPreviewOptions struct {
-	IsDisabled bool `json:"is_disabled"`
-}
-
-type TgSendMessageRequest struct {
-	ChatId    string `json:"chat_id"`
-	Text      string `json:"text"`
-	ParseMode string `json:"parse_mode,omitempty"`
-
-	DisableNotification bool                 `json:"disable_notification,omitempty"`
-	LinkPreviewOptions  TgLinkPreviewOptions `json:"link_preview_options,omitempty"`
-}
-
-type TgSendMessageResponse struct {
-	OK          bool   `json:"ok"`
-	Description string `json:"description"`
-	Result      struct {
-		MessageId int64 `json:"message_id"`
-	} `json:"result"`
-}
-
-type TgSendPhotoRequest struct {
-	ChatId    string `json:"chat_id"`
-	Photo     string `json:"photo"`
-	Caption   string `json:"caption"`
-	ParseMode string `json:"parse_mode"`
-}
-
-func tgSendPhoto(chatid, photourl, caption string) (msg *TgMessage, err error) {
-	// https://core.telegram.org/bots/api#sendphoto
-
-	sendphoto := TgSendPhotoRequest{
-		ChatId:    chatid,
-		Photo:     photourl,
-		Caption:   tgesc(caption),
-		ParseMode: TgParseMode,
-	}
-	if Config.DEBUG {
-		log("DEBUG sendphoto==%#v", sendphoto)
-	}
-	sendphotojson, err := json.Marshal(sendphoto)
-	if err != nil {
-		return nil, err
-	}
-
-	var tgresp TgResponse
-	err = httpPostJson(
-		fmt.Sprintf("https://api.telegram.org/bot%s/sendPhoto", Config.TgToken),
-		bytes.NewBuffer(sendphotojson),
-		&tgresp,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if !tgresp.Ok {
-		return nil, fmt.Errorf("sendPhoto response not ok: %s", tgresp.Description)
-	}
-
-	msg = tgresp.Result
-	msg.Id = fmt.Sprintf("%d", msg.MessageId)
-
-	return msg, nil
-}
-
-func tgSendMessage(chatid, text string) (msg *TgMessage, err error) {
-	// https://core.telegram.org/bots/api#sendmessage
-
-	sendmessage := TgSendMessageRequest{
-		ChatId:    chatid,
-		Text:      text,
-		ParseMode: TgParseMode,
-
-		LinkPreviewOptions: TgLinkPreviewOptions{IsDisabled: true},
-	}
-	if Config.DEBUG {
-		log("DEBUG sendmessage==%#v", sendmessage)
-	}
-	sendmessagejson, err := json.Marshal(sendmessage)
-	if err != nil {
-		return nil, err
-	}
-
-	var tgresp TgResponse
-	err = httpPostJson(
-		fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", Config.TgToken),
-		bytes.NewBuffer(sendmessagejson),
-		&tgresp,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if !tgresp.Ok {
-		return nil, fmt.Errorf("tgSendMessage: %s", tgresp.Description)
-	}
-
-	msg = tgresp.Result
-	msg.Id = fmt.Sprintf("%d", msg.MessageId)
-
-	return msg, nil
 }
 
 func ytgetplaylistid(ytusername string, ytchannelid string) (playlistid string, err error) {
@@ -690,11 +515,16 @@ func tgpostpublished(ytvideo youtube.Video) error {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	caption := tgesc(TgLangMessages[Config.TgLang]["published"]) + " " + NL +
-		tgbold(ytvideo.Snippet.Title) + NL +
-		tgesc(fmt.Sprintf("https://youtu.be/%s", ytvideo.Id)) + " " + NL
+	caption := tg.Esc(TgLangMessages[Config.TgLang]["published"]) + NL +
+		tg.Bold(ytvideo.Snippet.Title) + NL +
+		tg.Esc(fmt.Sprintf("https://youtu.be/%s", ytvideo.Id)) + NL
 
-	_, err := tgSendPhoto(Config.TgChatId, photourl, caption)
+	req := tg.SendPhotoRequest{
+		ChatId:  Config.TgChatId,
+		Photo:   photourl,
+		Caption: caption,
+	}
+	_, err := tg.SendPhoto(Config.TgToken, req)
 	if err != nil {
 		return fmt.Errorf("telegram send photo: %w", err)
 	}
@@ -710,17 +540,22 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	caption := tgesc(TgLangMessages[Config.TgLang]["nextlive"]) + " " + NL +
-		tgbold(Config.YtNextLiveTitle) + " " + NL +
-		tgbold(fmt.Sprintf("%s/%d %s",
+	caption := tg.Esc(TgLangMessages[Config.TgLang]["nextlive"]) + NL +
+		tg.Bold(Config.YtNextLiveTitle) + NL +
+		tg.Bold(fmt.Sprintf("%s/%d %s",
 			strings.ToTitle(strings.Fields(TgLangMessages[Config.TgLang]["months"])[Config.YtNextLive.In(TgTimezone).Month()-1]),
 			Config.YtNextLive.In(TgTimezone).Day(),
 			Config.YtNextLive.In(TgTimezone).Format("15:04")),
 		) + " " +
-		tgesc(fmt.Sprintf("(%s)", Config.TgTimezoneNameShort)) + " " + NL +
-		tgesc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + " " + NL
+		tg.Esc(fmt.Sprintf("(%s)", Config.TgTimezoneNameShort)) + NL +
+		tg.Esc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + NL
 
-	_, err = tgSendPhoto(Config.TgChatId, photourl, caption)
+	req := tg.SendPhotoRequest{
+		ChatId:  Config.TgChatId,
+		Photo:   photourl,
+		Caption: caption,
+	}
+	_, err = tg.SendPhoto(Config.TgToken, req)
 	if err != nil {
 		return fmt.Errorf("telegram send photo: %w", err)
 	}
@@ -731,67 +566,56 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 func tgpostlivereminder() error {
 	var err error
 
-	text := tgesc(TgLangMessages[Config.TgLang]["livereminder"]) + " " + NL +
-		tgbold(Config.YtNextLiveTitle) + " " + NL +
-		tgesc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + " " + NL
+	text := tg.Esc(TgLangMessages[Config.TgLang]["livereminder"]) + NL +
+		tg.Bold(Config.YtNextLiveTitle) + NL +
+		tg.Esc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + NL
 
 	if Config.DEBUG {
 		log("DEBUG tgpostlivereminder text: "+NL+"%s"+NL, text)
 	}
 
-	msg, err := tgSendMessage(Config.TgChatId, text)
+	req := tg.SendMessageRequest{
+		ChatId: Config.TgChatId,
+		Text:   text,
+
+		LinkPreviewOptions: tg.LinkPreviewOptions{IsDisabled: true},
+	}
+	msg, err := tg.SendMessage(Config.TgToken, req)
 	if err != nil {
 		return fmt.Errorf("telegram send message: %w", err)
 	}
 
-	log("posted telegram text message id:%s"+NL, msg.Id)
+	log("posted telegram text message id==%s"+NL, msg.Id)
 
 	return nil
+}
+
+func ts() string {
+	tnow := time.Now().Local()
+	return fmt.Sprintf(
+		"%d%02d%02d:%02d%02d%s",
+		tnow.Year()%1000, tnow.Month(), tnow.Day(),
+		tnow.Hour(), tnow.Minute(), LogTimeZone,
+	)
 }
 
 func log(msg string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, ts()+" "+msg+NL, args...)
 }
 
-func tglog(msg string, args ...interface{}) error {
+func tglog(msg string, args ...interface{}) (err error) {
 	log(msg, args...)
-	msgtext := fmt.Sprintf(msg, args...) + NL
-
-	smreq := TgSendMessageRequest{
-		ChatId:    Config.TgBossChatId,
-		Text:      tgesc(msgtext),
-		ParseMode: TgParseMode,
+	text := fmt.Sprintf(msg, args...) + NL
+	text = tg.Esc(text)
+	req := tg.SendMessageRequest{
+		ChatId: Config.TgBossChatId,
+		Text:   text,
 
 		DisableNotification: true,
-		LinkPreviewOptions:  TgLinkPreviewOptions{IsDisabled: true},
+		LinkPreviewOptions:  tg.LinkPreviewOptions{IsDisabled: true},
 	}
-	smreqjs, err := json.Marshal(smreq)
-	if err != nil {
-		return fmt.Errorf("tglog json marshal: %w", err)
-	}
-	smreqjsBuffer := bytes.NewBuffer(smreqjs)
-
-	var resp *http.Response
-	tgapiurl := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", Config.TgToken)
-	resp, err = http.Post(
-		tgapiurl,
-		"application/json",
-		smreqjsBuffer,
-	)
-	if err != nil {
-		return fmt.Errorf("tglog apiurl:`%s` apidata:`%s`: %w", tgapiurl, smreqjs, err)
-	}
-
-	var smresp TgSendMessageResponse
-	err = json.NewDecoder(resp.Body).Decode(&smresp)
-	if err != nil {
-		return fmt.Errorf("tglog decode response: %w", err)
-	}
-	if !smresp.OK {
-		return fmt.Errorf("tglog apiurl:`%s` apidata:`%s` api response not ok: %+v", tgapiurl, smreqjs, smresp)
-	}
-
-	return nil
+	_, err = tg.SendMessage(Config.TgToken, req)
+	return err
 }
 
 func (config *TgTubeNotiConfig) Get() error {
