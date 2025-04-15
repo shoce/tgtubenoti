@@ -574,13 +574,12 @@ func tgpostlivereminder() error {
 		log("DEBUG tgpostlivereminder text: "+NL+"%s"+NL, text)
 	}
 
-	req := tg.SendMessageRequest{
+	msg, err := tg.SendMessage(Config.TgToken, tg.SendMessageRequest{
 		ChatId: Config.TgChatId,
 		Text:   text,
 
 		LinkPreviewOptions: tg.LinkPreviewOptions{IsDisabled: true},
-	}
-	msg, err := tg.SendMessage(Config.TgToken, req)
+	})
 	if err != nil {
 		return fmt.Errorf("telegram send message: %w", err)
 	}
@@ -607,14 +606,13 @@ func tglog(msg string, args ...interface{}) (err error) {
 	log(msg, args...)
 	text := fmt.Sprintf(msg, args...) + NL
 	text = tg.Esc(text)
-	req := tg.SendMessageRequest{
+	_, err = tg.SendMessage(Config.TgToken, tg.SendMessageRequest{
 		ChatId: Config.TgBossChatId,
 		Text:   text,
 
 		DisableNotification: true,
 		LinkPreviewOptions:  tg.LinkPreviewOptions{IsDisabled: true},
-	}
-	_, err = tg.SendMessage(Config.TgToken, req)
+	})
 	return err
 }
 
