@@ -174,6 +174,8 @@ func init() {
 		os.Exit(1)
 	}
 
+	tg.ApiToken = Config.TgToken
+
 	if Config.TgLang == "" {
 		log("ERROR TgLang empty")
 		os.Exit(1)
@@ -519,13 +521,11 @@ func tgpostpublished(ytvideo youtube.Video) error {
 		tg.Bold(ytvideo.Snippet.Title) + NL +
 		tg.Esc(fmt.Sprintf("https://youtu.be/%s", ytvideo.Id)) + NL
 
-	req := tg.SendPhotoRequest{
+	if _, err := tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
 		Photo:   photourl,
 		Caption: caption,
-	}
-	_, err := tg.SendPhoto(Config.TgToken, req)
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("telegram send photo: %w", err)
 	}
 
@@ -550,13 +550,11 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 		tg.Esc(fmt.Sprintf("(%s)", Config.TgTimezoneNameShort)) + NL +
 		tg.Esc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + NL
 
-	req := tg.SendPhotoRequest{
+	if _, err = tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
 		Photo:   photourl,
 		Caption: caption,
-	}
-	_, err = tg.SendPhoto(Config.TgToken, req)
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("telegram send photo: %w", err)
 	}
 
@@ -574,7 +572,7 @@ func tgpostlivereminder() error {
 		log("DEBUG tgpostlivereminder text: "+NL+"%s"+NL, text)
 	}
 
-	msg, err := tg.SendMessage(Config.TgToken, tg.SendMessageRequest{
+	msg, err := tg.SendMessage(tg.SendMessageRequest{
 		ChatId: Config.TgChatId,
 		Text:   text,
 
@@ -606,7 +604,7 @@ func tglog(msg string, args ...interface{}) (err error) {
 	log(msg, args...)
 	text := fmt.Sprintf(msg, args...) + NL
 	text = tg.Esc(text)
-	_, err = tg.SendMessage(Config.TgToken, tg.SendMessageRequest{
+	_, err = tg.SendMessage(tg.SendMessageRequest{
 		ChatId: Config.TgBossChatId,
 		Text:   text,
 
