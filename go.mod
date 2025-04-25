@@ -3,7 +3,7 @@ module github.com/shoce/tgtubenoti
 go 1.24.2
 
 require (
-	github.com/shoce/tg v0.250423.2008
+	github.com/shoce/tg v0.250424.1142
 	google.golang.org/api v0.230.0
 	gopkg.in/yaml.v3 v3.0.1
 )
