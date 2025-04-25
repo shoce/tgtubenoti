@@ -78,8 +78,6 @@ type TgTubeNotiConfig struct {
 var (
 	Config TgTubeNotiConfig
 
-	LogTimeZone string
-
 	HttpClient = &http.Client{}
 
 	YtSvc *youtube.Service
@@ -142,9 +140,6 @@ var (
 
 func init() {
 	var err error
-
-	LogTimeZone = time.Now().Local().Format("-0700")
-	LogTimeZone = strings.TrimRight(LogTimeZone, "0")
 
 	if v := os.Getenv("YssUrl"); v != "" {
 		Config.YssUrl = v
@@ -590,9 +585,9 @@ func tgpostlivereminder() error {
 func ts() string {
 	tnow := time.Now().In(time.FixedZone("IST", 330*60))
 	return fmt.Sprintf(
-		"%d%02d%02d:%02d%02d%s",
+		"%d%02d%02d:%02d%02d",
 		tnow.Year()%1000, tnow.Month(), tnow.Day(),
-		tnow.Hour(), tnow.Minute(), LogTimeZone,
+		tnow.Hour(), tnow.Minute(),
 	)
 }
 
