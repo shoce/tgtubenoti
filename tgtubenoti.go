@@ -265,7 +265,7 @@ func CheckTube() (err error) {
 		}
 	}
 
-	if tonextlive := Config.YtNextLive.Sub(time.Now()); tonextlive > 57*time.Minute && tonextlive < 61*time.Minute {
+	if tonextlive := Config.YtNextLive.Sub(time.Now()); tonextlive > 56*time.Minute && tonextlive < 62*time.Minute {
 		if !Config.YtNextLiveReminderSent {
 			err = tgpostlivereminder()
 			if err != nil {
@@ -514,7 +514,7 @@ func tgpostpublished(ytvideo youtube.Video) error {
 
 	caption := tg.Esc(TgLangMessages[Config.TgLang]["published"]) + NL +
 		tg.Bold(ytvideo.Snippet.Title) + NL +
-		tg.Esc(fmt.Sprintf("https://youtu.be/%s", ytvideo.Id)) + NL
+		tg.Esc("youtu.be/%s", ytvideo.Id) + NL
 
 	if _, err := tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
@@ -537,13 +537,12 @@ func tgpostnextlive(ytvideo youtube.Video) error {
 
 	caption := tg.Esc(TgLangMessages[Config.TgLang]["nextlive"]) + NL +
 		tg.Bold(Config.YtNextLiveTitle) + NL +
-		tg.Bold(fmt.Sprintf("%s/%d %s",
+		tg.Bold("%s/%d %s",
 			strings.ToTitle(strings.Fields(TgLangMessages[Config.TgLang]["months"])[Config.YtNextLive.In(TgTimezone).Month()-1]),
 			Config.YtNextLive.In(TgTimezone).Day(),
-			Config.YtNextLive.In(TgTimezone).Format("15:04")),
-		) + " " +
-		tg.Esc(fmt.Sprintf("(%s)", Config.TgTimezoneNameShort)) + NL +
-		tg.Esc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + NL
+			Config.YtNextLive.In(TgTimezone).Format("15:04"),
+		) + " " + tg.Esc("(%s)", Config.TgTimezoneNameShort) + NL +
+		tg.Esc("youtu.be/%s", Config.YtNextLiveId) + NL
 
 	if _, err = tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
@@ -561,7 +560,7 @@ func tgpostlivereminder() error {
 
 	text := tg.Esc(TgLangMessages[Config.TgLang]["livereminder"]) + NL +
 		tg.Bold(Config.YtNextLiveTitle) + NL +
-		tg.Esc(fmt.Sprintf("https://youtu.be/%s", Config.YtNextLiveId)) + NL
+		tg.Esc("youtu.be/%s", Config.YtNextLiveId) + NL
 
 	if Config.DEBUG {
 		log("DEBUG tgpostlivereminder text: "+NL+"%s"+NL, text)
@@ -597,11 +596,9 @@ func log(msg string, args ...interface{}) {
 
 func tglog(msg string, args ...interface{}) (err error) {
 	log(msg, args...)
-	text := fmt.Sprintf(msg, args...) + NL
-	text = tg.Esc(text)
 	_, err = tg.SendMessage(tg.SendMessageRequest{
 		ChatId: Config.TgBossChatId,
-		Text:   text,
+		Text:   tg.Esc(msg, args...),
 
 		DisableNotification: true,
 		LinkPreviewOptions:  tg.LinkPreviewOptions{IsDisabled: true},
