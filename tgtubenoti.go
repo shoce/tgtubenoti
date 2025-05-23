@@ -269,7 +269,7 @@ func CheckTube() (err error) {
 		if !Config.YtNextLiveReminderSent {
 			err = tgpostlivereminder()
 			if err != nil {
-				tglog("WARNING telegram post next live reminder: %s", err)
+				tglog("ERROR telegram post next live reminder: %s", err)
 			} else {
 				Config.YtNextLiveReminderSent = true
 				err = Config.Put()
@@ -335,7 +335,7 @@ func CheckTube() (err error) {
 
 	if Config.DEBUG {
 		for j, v := range ytvideos {
-			tglog(
+			log(
 				"DEBUG"+NL+"%d/%d"+" "+"%s"+NL+
 					"youtu.be/%s"+" "+"%s"+NL+"liveStreamingDetails==%+v",
 				j+1, len(ytvideos), v.Snippet.Title, v.Id,
@@ -349,7 +349,7 @@ func CheckTube() (err error) {
 		if v.Snippet.PublishedAt <= Config.YtLastPublishedAt {
 
 			// skip
-			tglog("skipping video %s %s", v.Id, v.Snippet.PublishedAt)
+			log("skipping video %s %s", v.Id, v.Snippet.PublishedAt)
 
 			Config.YtLastPublishedAt = v.Snippet.PublishedAt
 
