@@ -7,9 +7,7 @@ https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas
 # twice an hour schedule uses 4800 quota per day
 # trice an hour schedule uses 7200 quota per day
 
-GoGet
-GoFmt
-GoBuildNull
+GoGet GoFmt GoBuildNull
 
 */
 
@@ -364,7 +362,7 @@ func CheckTube() (err error) {
 
 			err = tgpostpublished(v)
 			if err != nil {
-				return fmt.Errorf("telegram post published youtube video: %w", err)
+				return fmt.Errorf("post published: %w", err)
 			}
 
 			Config.YtLastPublishedAt = v.Snippet.PublishedAt
@@ -382,10 +380,15 @@ func CheckTube() (err error) {
 
 			// live
 
-			if v, err := time.Parse(time.RFC3339, v.LiveStreamingDetails.ScheduledStartTime); err == nil {
+			scheduledstarttime := v.LiveStreamingDetails.ScheduledStartTime
+			if scheduledstarttime == "" {
+				return fmt.Errorf("post live %v ScheduledStartTime is empty", v)
+			}
+
+			if v, err := time.Parse(time.RFC3339, scheduledstarttime); err == nil {
 				Config.YtNextLive = v
 			} else {
-				return fmt.Errorf("telegram post next live time.Parse ScheduledStartTime: %w", err)
+				return fmt.Errorf("post live time.Parse ScheduledStartTime: %w", err)
 			}
 			Config.YtNextLiveId = v.Id
 			Config.YtNextLiveTitle = v.Snippet.Title
@@ -396,9 +399,9 @@ func CheckTube() (err error) {
 				log("ERROR Config.Put: %s", err)
 			}
 
-			err = tgpostnextlive(v)
+			err = tgpostlive(v)
 			if err != nil {
-				return fmt.Errorf("telegram post next live: %w", err)
+				return fmt.Errorf("post live: %w", err)
 			}
 
 			Config.YtLastPublishedAt = v.Snippet.PublishedAt
@@ -527,7 +530,7 @@ func tgpostpublished(ytvideo youtube.Video) error {
 	return nil
 }
 
-func tgpostnextlive(ytvideo youtube.Video) error {
+func tgpostlive(ytvideo youtube.Video) error {
 	var err error
 
 	var photourl string
