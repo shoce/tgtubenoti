@@ -331,22 +331,25 @@ func CheckTube() (err error) {
 		}
 	}
 
-	if Config.DEBUG {
-		for j, v := range ytvideos {
-			log(
-				"DEBUG"+NL+"%d/%d"+" "+"%s"+NL+
-					"youtu.be/%s"+" "+"%s"+NL+"liveStreamingDetails==%+v",
-				j+1, len(ytvideos), v.Snippet.Title, v.Id,
-				v.Snippet.PublishedAt, v.LiveStreamingDetails,
-			)
+	/*
+		if Config.DEBUG {
+			for j, v := range ytvideos {
+				log(
+					"DEBUG"+NL+"%d/%d"+" "+"%s"+NL+
+						"youtu.be/%s"+" "+"%s"+NL+"liveStreamingDetails==%+v",
+					j+1, len(ytvideos), v.Snippet.Title, v.Id,
+					v.Snippet.PublishedAt, v.LiveStreamingDetails,
+				)
+			}
 		}
-	}
+	*/
 
 	for _, v := range ytvideos {
 
 		if v.Snippet.PublishedAt <= Config.YtLastPublishedAt {
 
 			// skip
+
 			log("skipping video %s %s", v.Id, v.Snippet.PublishedAt)
 
 			Config.YtLastPublishedAt = v.Snippet.PublishedAt
@@ -381,27 +384,28 @@ func CheckTube() (err error) {
 			// live
 
 			scheduledstarttime := v.LiveStreamingDetails.ScheduledStartTime
-			if scheduledstarttime == "" {
-				return fmt.Errorf("post live %v ScheduledStartTime is empty", v)
-			}
 
-			if v, err := time.Parse(time.RFC3339, scheduledstarttime); err == nil {
-				Config.YtNextLive = v
-			} else {
-				return fmt.Errorf("post live time.Parse ScheduledStartTime: %w", err)
-			}
-			Config.YtNextLiveId = v.Id
-			Config.YtNextLiveTitle = v.Snippet.Title
-			Config.YtNextLiveReminderSent = false
+			if scheduledstarttime != "" {
 
-			err = Config.Put()
-			if err != nil {
-				log("ERROR Config.Put: %s", err)
-			}
+				if v, err := time.Parse(time.RFC3339, scheduledstarttime); err == nil {
+					Config.YtNextLive = v
+				} else {
+					return fmt.Errorf("post live time.Parse ScheduledStartTime: %w", err)
+				}
+				Config.YtNextLiveId = v.Id
+				Config.YtNextLiveTitle = v.Snippet.Title
+				Config.YtNextLiveReminderSent = false
 
-			err = tgpostlive(v)
-			if err != nil {
-				return fmt.Errorf("post live: %w", err)
+				err = Config.Put()
+				if err != nil {
+					log("ERROR Config.Put: %s", err)
+				}
+
+				err = tgpostlive(v)
+				if err != nil {
+					return fmt.Errorf("post live: %w", err)
+				}
+
 			}
 
 			Config.YtLastPublishedAt = v.Snippet.PublishedAt
