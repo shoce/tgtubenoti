@@ -148,15 +148,15 @@ func init() {
 	}
 
 	if err := Config.Get(); err != nil {
-		log("ERROR Config.Get: %v", err)
+		log("ERROR Config.Get %v", err)
 		os.Exit(1)
 	}
 
 	if Config.DEBUG {
-		log("DEBUG==true")
+		log("DEBUG <true>")
 	}
 
-	log("Interval: %v", Config.Interval)
+	log("Interval <%v>", Config.Interval)
 	if Config.Interval == 0 {
 		log("ERROR Interval empty")
 		os.Exit(1)
@@ -174,10 +174,10 @@ func init() {
 		os.Exit(1)
 	}
 	if _, ok := TgLangMessages[Config.TgLang]; !ok {
-		log("ERROR TgLang `%s` not supported")
+		log("ERROR TgLang [%s] not supported")
 		os.Exit(1)
 	}
-	log("DEBUG TgLang: %s", Config.TgLang)
+	log("DEBUG TgLang %s", Config.TgLang)
 
 	if Config.TgTimezoneName == "" {
 		log("ERROR TgTimezoneName empty")
@@ -185,10 +185,10 @@ func init() {
 	}
 	TgTimezone, err = time.LoadLocation(Config.TgTimezoneName)
 	if err != nil {
-		tglog("ERROR time.LoadLocation `%s`: %v", Config.TgTimezoneName, err)
+		tglog("ERROR time.LoadLocation [%s] %v", Config.TgTimezoneName, err)
 		os.Exit(1)
 	}
-	log("DEBUG TgTimezoneName: %s", Config.TgTimezoneName)
+	log("DEBUG TgTimezoneName %s", Config.TgTimezoneName)
 
 	Config.TgTimezoneNameShort = Config.TgTimezoneName
 	Config.TgTimezoneNameShort = strings.ToLower(Config.TgTimezoneNameShort)
@@ -196,7 +196,7 @@ func init() {
 	if i := strings.LastIndex(Config.TgTimezoneNameShort, "/"); i >= 0 && len(Config.TgTimezoneNameShort) > i+1 {
 		Config.TgTimezoneNameShort = Config.TgTimezoneNameShort[i+1:]
 	}
-	log("DEBUG TgTimezoneNameShort: %s", Config.TgTimezoneNameShort)
+	log("DEBUG TgTimezoneNameShort %s", Config.TgTimezoneNameShort)
 
 	if Config.TgChatId == "" {
 		log("ERROR TgChatId empty")
