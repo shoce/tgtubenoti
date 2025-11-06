@@ -246,7 +246,7 @@ func main() {
 
 		err = CheckTube()
 		if err != nil {
-			tglog("ERROR CheckTube: %v", err)
+			tglog("ERROR CheckTube %v", err)
 		}
 
 		if dur := time.Now().Sub(t0); dur < Config.Interval {
@@ -272,7 +272,7 @@ func CheckTube() (err error) {
 				Config.YtNextLiveReminderSent = true
 				err = Config.Put()
 				if err != nil {
-					log("ERROR Config.Put: %s", err)
+					log("ERROR Config.Put %s", err)
 				}
 			}
 		}
@@ -293,56 +293,54 @@ func CheckTube() (err error) {
 
 	err = Config.Put()
 	if err != nil {
-		log("ERROR Config.Put: %s", err)
+		log("ERROR Config.Put %s", err)
 	}
 
 	// youtube service
 
 	YtSvc, err = youtube.NewService(context.TODO(), youtubeoption.WithAPIKey(Config.YtKey))
 	if err != nil {
-		return fmt.Errorf("youtube.NewService: %w", err)
+		return fmt.Errorf("youtube.NewService %w", err)
 	}
 
 	Config.YtPlaylistId, err = ytgetplaylistid(Config.YtUsername, Config.YtChannelId)
 	if err != nil {
-		return fmt.Errorf("get youtube playlist id: %w", err)
+		return fmt.Errorf("get youtube playlist id %w", err)
 	}
 	if Config.YtPlaylistId == "" {
 		return fmt.Errorf("YtPlaylistId empty")
 	}
 
 	if Config.DEBUG {
-		log("DEBUG channel id: %s", Config.YtChannelId)
-		log("DEBUG playlist id: %s", Config.YtPlaylistId)
+		log("DEBUG channel id %s", Config.YtChannelId)
+		log("DEBUG playlist id %s", Config.YtPlaylistId)
 	}
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideosids []string
 	ytvideosids, err = ytplaylistitemslist(Config.YtPlaylistId, Config.YtLastPublishedAt)
 	if err != nil {
-		return fmt.Errorf("youtube playlist items list: %v", err)
+		return fmt.Errorf("youtube playlist items list %v", err)
 	}
 
 	var ytvideos []youtube.Video
 	if len(ytvideosids) > 0 {
 		ytvideos, err = ytvideoslist(ytvideosids)
 		if err != nil {
-			return fmt.Errorf("youtube videos list: %v", err)
+			return fmt.Errorf("youtube videos list %v", err)
 		}
 	}
 
-	/*
-		if Config.DEBUG {
-			for j, v := range ytvideos {
-				log(
-					"DEBUG"+NL+"%d/%d"+" "+"%s"+NL+
-						"youtu.be/%s"+" "+"%s"+NL+"liveStreamingDetails==%+v",
-					j+1, len(ytvideos), v.Snippet.Title, v.Id,
-					v.Snippet.PublishedAt, v.LiveStreamingDetails,
-				)
-			}
+	if Config.DEBUG {
+		for j, v := range ytvideos {
+			log(
+				"DEBUG"+NL+"%d/%d"+" "+"%s"+NL+
+					"youtu.be/%s"+" "+"%s"+NL+"liveStreamingDetails==%+v",
+				j+1, len(ytvideos), v.Snippet.Title, v.Id,
+				v.Snippet.PublishedAt, v.LiveStreamingDetails,
+			)
 		}
-	*/
+	}
 
 	for _, v := range ytvideos {
 
@@ -356,7 +354,7 @@ func CheckTube() (err error) {
 
 			err = Config.Put()
 			if err != nil {
-				log("ERROR Config.Put: %s", err)
+				log("ERROR Config.Put %s", err)
 			}
 
 		} else if v.LiveStreamingDetails == nil || v.LiveStreamingDetails.ActualEndTime != "" {
@@ -365,14 +363,14 @@ func CheckTube() (err error) {
 
 			err = tgpostpublished(v)
 			if err != nil {
-				return fmt.Errorf("post published: %w", err)
+				return fmt.Errorf("post published %w", err)
 			}
 
 			Config.YtLastPublishedAt = v.Snippet.PublishedAt
 
 			err = Config.Put()
 			if err != nil {
-				log("ERROR Config.Put: %s", err)
+				log("ERROR Config.Put %s", err)
 			}
 
 		} else if v.LiveStreamingDetails.ActualStartTime != "" && v.LiveStreamingDetails.ActualEndTime == "" {
@@ -390,7 +388,7 @@ func CheckTube() (err error) {
 				if v, err := time.Parse(time.RFC3339, scheduledstarttime); err == nil {
 					Config.YtNextLive = v
 				} else {
-					return fmt.Errorf("post live time.Parse ScheduledStartTime: %w", err)
+					return fmt.Errorf("post live time.Parse ScheduledStartTime %w", err)
 				}
 				Config.YtNextLiveId = v.Id
 				Config.YtNextLiveTitle = v.Snippet.Title
@@ -398,12 +396,12 @@ func CheckTube() (err error) {
 
 				err = Config.Put()
 				if err != nil {
-					log("ERROR Config.Put: %s", err)
+					log("ERROR Config.Put %s", err)
 				}
 
 				err = tgpostlive(v)
 				if err != nil {
-					return fmt.Errorf("post live: %w", err)
+					return fmt.Errorf("post live %w", err)
 				}
 
 			}
@@ -412,7 +410,7 @@ func CheckTube() (err error) {
 
 			err = Config.Put()
 			if err != nil {
-				log("ERROR Config.Put: %s", err)
+				log("ERROR Config.Put %s", err)
 			}
 		}
 
@@ -432,14 +430,14 @@ func ytgetplaylistid(ytusername string, ytchannelid string) (playlistid string, 
 	}
 	channelslist, err := channelslistcall.Do()
 	if err != nil {
-		return "", fmt.Errorf("youtube channels list: %w", err)
+		return "", fmt.Errorf("youtube channels list %w", err)
 	}
 
 	if len(channelslist.Items) == 0 {
-		return "", fmt.Errorf("youtube channels list: empty result")
+		return "", fmt.Errorf("youtube channels list empty result")
 	}
 	if len(channelslist.Items) > 1 {
-		return "", fmt.Errorf("channels list: more than one result")
+		return "", fmt.Errorf("channels list more than one result")
 	}
 
 	playlistid = channelslist.Items[0].ContentDetails.RelatedPlaylists.Uploads
@@ -520,15 +518,15 @@ func tgpostpublished(ytvideo youtube.Video) error {
 	}
 
 	caption := tg.Esc(TgLangMessages[Config.TgLang]["published"]) + NL +
-		tg.Bold(ytvideo.Snippet.Title) + NL +
-		tg.Esc("youtu.be/%s", ytvideo.Id) + NL
+		tg.Bold(tg.Esc(ytvideo.Snippet.Title)) + NL +
+		tg.Esc(tg.F("youtu.be/%s", ytvideo.Id)) + NL
 
 	if _, err := tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
 		Photo:   photourl,
 		Caption: caption,
 	}); err != nil {
-		return fmt.Errorf("telegram send photo: %w", err)
+		return fmt.Errorf("telegram send photo %w", err)
 	}
 
 	return nil
@@ -544,19 +542,19 @@ func tgpostlive(ytvideo youtube.Video) error {
 
 	caption := tg.Esc(TgLangMessages[Config.TgLang]["nextlive"]) + NL +
 		tg.Bold(Config.YtNextLiveTitle) + NL +
-		tg.Bold("%s/%d %s",
+		tg.Bold(tg.F("%s/%d %s",
 			strings.ToTitle(strings.Fields(TgLangMessages[Config.TgLang]["months"])[Config.YtNextLive.In(TgTimezone).Month()-1]),
 			Config.YtNextLive.In(TgTimezone).Day(),
 			Config.YtNextLive.In(TgTimezone).Format("15:04"),
-		) + " " + tg.Esc("(%s)", Config.TgTimezoneNameShort) + NL +
-		tg.Esc("youtu.be/%s", Config.YtNextLiveId) + NL
+		)) + " " + tg.Esc(tg.F("(%s)", Config.TgTimezoneNameShort)) + NL +
+		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId)) + NL
 
 	if _, err = tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
 		Photo:   photourl,
 		Caption: caption,
 	}); err != nil {
-		return fmt.Errorf("telegram send photo: %w", err)
+		return fmt.Errorf("telegram send photo %w", err)
 	}
 
 	return nil
@@ -567,10 +565,10 @@ func tgpostlivereminder() error {
 
 	text := tg.Esc(TgLangMessages[Config.TgLang]["livereminder"]) + NL +
 		tg.Bold(Config.YtNextLiveTitle) + NL +
-		tg.Esc("youtu.be/%s", Config.YtNextLiveId) + NL
+		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId)) + NL
 
 	if Config.DEBUG {
-		log("DEBUG tgpostlivereminder text: "+NL+"%s"+NL, text)
+		log("DEBUG tgpostlivereminder text "+NL+"%s"+NL, text)
 	}
 
 	msg, err := tg.SendMessage(tg.SendMessageRequest{
@@ -580,10 +578,10 @@ func tgpostlivereminder() error {
 		LinkPreviewOptions: tg.LinkPreviewOptions{IsDisabled: true},
 	})
 	if err != nil {
-		return fmt.Errorf("telegram send message: %w", err)
+		return fmt.Errorf("telegram send message %w", err)
 	}
 
-	log("posted telegram text message id==%s"+NL, msg.Id)
+	log("posted telegram text message id %s"+NL, msg.Id)
 
 	return nil
 }
@@ -605,7 +603,7 @@ func tglog(msg string, args ...interface{}) (err error) {
 	log(msg, args...)
 	_, err = tg.SendMessage(tg.SendMessageRequest{
 		ChatId: Config.TgBossChatId,
-		Text:   tg.Esc(msg, args...),
+		Text:   tg.Esc(tg.F(msg, args...)),
 
 		DisableNotification: true,
 		LinkPreviewOptions:  tg.LinkPreviewOptions{IsDisabled: true},
@@ -637,7 +635,7 @@ func (config *TgTubeNotiConfig) Get() error {
 	}
 
 	if config.DEBUG {
-		log("DEBUG Config.Get: %+v", config)
+		log("DEBUG Config.Get %+v", config)
 	}
 
 	return nil
