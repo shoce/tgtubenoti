@@ -236,8 +236,8 @@ func main() {
 	signal.Notify(sigterm, syscall.SIGTERM)
 	go func(sigterm chan os.Signal) {
 		<-sigterm
-		tglog("%s: sigterm", os.Args[0])
-		log("sigterm received")
+		tglog("%s sigterm", os.Args[0])
+		log("sigterm")
 		os.Exit(1)
 	}(sigterm)
 
@@ -334,10 +334,8 @@ func CheckTube() (err error) {
 	if Config.DEBUG {
 		for j, v := range ytvideos {
 			log(
-				"DEBUG"+NL+"%d/%d"+" "+"%s"+NL+
-					"youtu.be/%s"+" "+"%s"+NL+"liveStreamingDetails==%+v",
-				j+1, len(ytvideos), v.Snippet.Title, v.Id,
-				v.Snippet.PublishedAt, v.LiveStreamingDetails,
+				"DEBUG %d/%d %s youtu.be/%s %s liveStreamingDetails %+v",
+				j+1, len(ytvideos), v.Snippet.Title, v.Id, v.Snippet.PublishedAt, v.LiveStreamingDetails,
 			)
 		}
 	}
