@@ -515,16 +515,20 @@ func tgpostpublished(ytvideo youtube.Video) error {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	caption := tg.Esc(TgLangMessages[Config.TgLang]["published"]) + NL +
+	tgmsg := tg.Esc(TgLangMessages[Config.TgLang]["published"]) + NL +
 		tg.Bold(tg.Esc(ytvideo.Snippet.Title)) + NL +
 		tg.Esc(tg.F("youtu.be/%s", ytvideo.Id)) + NL
+
+	if Config.DEBUG {
+		log("DEBUG tgpostpublished msg "+NL+"%s"+NL, tgmsg)
+	}
 
 	if _, err := tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
 		Photo:   photourl,
-		Caption: caption,
+		Caption: tgmsg,
 	}); err != nil {
-		return fmt.Errorf("telegram send photo %w", err)
+		return fmt.Errorf("tg.SendPhoto %w", err)
 	}
 
 	return nil
@@ -538,7 +542,7 @@ func tgpostlive(ytvideo youtube.Video) error {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
-	caption := tg.Esc(TgLangMessages[Config.TgLang]["nextlive"]) + NL +
+	tgmsg := tg.Esc(TgLangMessages[Config.TgLang]["nextlive"]) + NL +
 		tg.Bold(Config.YtNextLiveTitle) + NL +
 		tg.Bold(tg.F("%s/%d %s",
 			strings.ToTitle(strings.Fields(TgLangMessages[Config.TgLang]["months"])[Config.YtNextLive.In(TgTimezone).Month()-1]),
@@ -547,12 +551,16 @@ func tgpostlive(ytvideo youtube.Video) error {
 		)) + " " + tg.Esc(tg.F("(%s)", Config.TgTimezoneNameShort)) + NL +
 		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId)) + NL
 
+	if Config.DEBUG {
+		log("DEBUG tgpostlive msg "+NL+"%s"+NL, tgmsg)
+	}
+
 	if _, err = tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
 		Photo:   photourl,
-		Caption: caption,
+		Caption: tgmsg,
 	}); err != nil {
-		return fmt.Errorf("telegram send photo %w", err)
+		return fmt.Errorf("tg.SendPhoto %w", err)
 	}
 
 	return nil
@@ -561,22 +569,22 @@ func tgpostlive(ytvideo youtube.Video) error {
 func tgpostlivereminder() error {
 	var err error
 
-	text := tg.Esc(TgLangMessages[Config.TgLang]["livereminder"]) + NL +
+	tgmsg := tg.Esc(TgLangMessages[Config.TgLang]["livereminder"]) + NL +
 		tg.Bold(Config.YtNextLiveTitle) + NL +
 		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId)) + NL
 
 	if Config.DEBUG {
-		log("DEBUG tgpostlivereminder text "+NL+"%s"+NL, text)
+		log("DEBUG tgpostlivereminder msg "+NL+"%s"+NL, tgmsg)
 	}
 
 	msg, err := tg.SendMessage(tg.SendMessageRequest{
 		ChatId: Config.TgChatId,
-		Text:   text,
+		Text:   tgmsg,
 
 		LinkPreviewOptions: tg.LinkPreviewOptions{IsDisabled: true},
 	})
 	if err != nil {
-		return fmt.Errorf("telegram send message %w", err)
+		return fmt.Errorf("tg.SendMessage %w", err)
 	}
 
 	log("posted telegram text message id %s"+NL, msg.Id)
