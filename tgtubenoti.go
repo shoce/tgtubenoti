@@ -249,8 +249,11 @@ func main() {
 			tglog("ERROR CheckTube %v", err)
 		}
 
-		if dur := time.Now().Sub(t0); dur < Config.Interval {
-			time.Sleep(Config.Interval - dur)
+		if dur := Config.Interval - time.Now().Sub(t0); dur > time.Second {
+			if Config.DEBUG {
+				log("sleep %v", dur.Truncate(time.Second))
+			}
+			time.Sleep(dur)
 		}
 	}
 
@@ -517,10 +520,10 @@ func tgpostpublished(ytvideo youtube.Video) error {
 
 	tgmsg := tg.Esc(TgLangMessages[Config.TgLang]["published"]) + NL +
 		tg.Bold(tg.Esc(ytvideo.Snippet.Title)) + NL +
-		tg.Esc(tg.F("youtu.be/%s", ytvideo.Id)) + NL
+		tg.Esc(tg.F("youtu.be/%s", ytvideo.Id))
 
 	if Config.DEBUG {
-		log("DEBUG tgpostpublished msg "+NL+"%s"+NL, tgmsg)
+		log("DEBUG tgpostpublished msg "+NL+"%s", tgmsg)
 	}
 
 	if _, err := tg.SendPhoto(tg.SendPhotoRequest{
@@ -549,10 +552,10 @@ func tgpostlive(ytvideo youtube.Video) error {
 			Config.YtNextLive.In(TgTimezone).Day(),
 			Config.YtNextLive.In(TgTimezone).Format("15:04"),
 		)) + " " + tg.Esc(tg.F("(%s)", Config.TgTimezoneNameShort)) + NL +
-		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId)) + NL
+		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId))
 
 	if Config.DEBUG {
-		log("DEBUG tgpostlive msg "+NL+"%s"+NL, tgmsg)
+		log("DEBUG tgpostlive msg "+NL+"%s", tgmsg)
 	}
 
 	if _, err = tg.SendPhoto(tg.SendPhotoRequest{
@@ -571,10 +574,10 @@ func tgpostlivereminder() error {
 
 	tgmsg := tg.Esc(TgLangMessages[Config.TgLang]["livereminder"]) + NL +
 		tg.Bold(Config.YtNextLiveTitle) + NL +
-		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId)) + NL
+		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId))
 
 	if Config.DEBUG {
-		log("DEBUG tgpostlivereminder msg "+NL+"%s"+NL, tgmsg)
+		log("DEBUG tgpostlivereminder msg "+NL+"%s", tgmsg)
 	}
 
 	msg, err := tg.SendMessage(tg.SendMessageRequest{
