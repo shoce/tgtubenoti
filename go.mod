@@ -3,8 +3,8 @@ module github.com/shoce/tgtubenoti
 go 1.24.2
 
 require (
-	github.com/shoce/tg v0.251126.830
-	google.golang.org/api v0.256.0
+	github.com/shoce/tg v0.251129.1926
+	google.golang.org/api v0.257.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -29,7 +29,7 @@ require (
 	golang.org/x/oauth2 v0.33.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251124214823-79d6a2a48846 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/grpc v1.77.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )
