@@ -647,7 +647,7 @@ func (cfg *TgTubeNotiConfig) Get() error {
 	}
 
 	if cfg.DEBUG {
-		perr("DEBUG cfg.Get %+v", cfg)
+		perr("DEBUG Config.Get %+v", cfg)
 	}
 
 	return nil
