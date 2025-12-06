@@ -32,6 +32,12 @@ import (
 	youtube "google.golang.org/api/youtube/v3"
 	yaml "gopkg.in/yaml.v3"
 
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
+
+	_ "golang.org/x/image/webp"
+
 	"github.com/shoce/tg"
 )
 
@@ -521,6 +527,22 @@ func tgpostpublished(ytvideo youtube.Video) error {
 		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
+	var err error
+	var photoBytes []byte
+	photoBytes, err = downloadFile(photourl)
+	if err != nil {
+		return fmt.Errorf("download photo url [%s] %v", photourl, err)
+	}
+
+	if photoImg, photoImgFmt, err := image.Decode(bytes.NewReader(photoBytes)); err != nil {
+		perr("ERROR photo url [%s] decode %v", photourl, err)
+	} else {
+		dx, dy := photoImg.Bounds().Dx(), photoImg.Bounds().Dy()
+		if Config.DEBUG {
+			perr("DEBUG photo url [%s] fmt [%s] size <%dkb> res <%dx%d>", photourl, photoImgFmt, len(photoBytes)>>10, dx, dy)
+		}
+	}
+
 	tgmsg := tg.Esc(TgLangMessages[Config.TgLang]["published"]) + NL +
 		tg.Bold(tg.Esc(ytvideo.Snippet.Title)) + NL +
 		tg.Esc(tg.F("youtu.be/%s", ytvideo.Id))
@@ -596,6 +618,22 @@ func tgpostlivereminder() error {
 	perr("posted telegram text message id %s"+NL, msg.Id)
 
 	return nil
+}
+
+func downloadFile(url string) ([]byte, error) {
+	resp, err := HttpClient.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bb := bytes.NewBuffer(nil)
+
+	if _, err := io.Copy(bb, resp.Body); err != nil {
+		return nil, err
+	}
+
+	return bb.Bytes(), nil
 }
 
 func ts() string {
