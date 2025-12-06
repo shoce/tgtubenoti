@@ -34,6 +34,7 @@ import (
 
 	"image"
 	_ "image/jpeg"
+	"image/png"
 	_ "image/png"
 
 	_ "golang.org/x/image/webp"
@@ -506,7 +507,7 @@ func ytvideoslist(ytvideosids []string) (ytvideos []youtube.Video, err error) {
 	return ytvideos, nil
 }
 
-func ytvideoPhotoUrl(ytthumbs youtube.ThumbnailDetails) (photourl string) {
+func ytvideoThumbUrl(ytthumbs youtube.ThumbnailDetails) (photourl string) {
 	switch {
 	case ytthumbs.Maxres != nil && ytthumbs.Maxres.Url != "":
 		photourl = ytthumbs.Maxres.Url
@@ -523,24 +524,32 @@ func ytvideoPhotoUrl(ytthumbs youtube.ThumbnailDetails) (photourl string) {
 }
 
 func tgpostpublished(ytvideo youtube.Video) error {
-	var photourl string
+	var thumbUrl string
 	if ytvideo.Snippet.Thumbnails != nil {
-		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
+		thumbUrl = ytvideoThumbUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
 	var err error
-	var photoBytes []byte
-	photoBytes, err = downloadFile(photourl)
+	var thumbBytes []byte
+	thumbBytes, err = downloadFile(thumbUrl)
 	if err != nil {
-		return fmt.Errorf("download photo url [%s] %v", photourl, err)
+		return fmt.Errorf("download thumb url [%s] %v", thumbUrl, err)
 	}
 
-	if photoImg, photoImgFmt, err := image.Decode(bytes.NewReader(photoBytes)); err != nil {
-		perr("ERROR photo url [%s] decode %v", photourl, err)
+	if thumbImg, thumbImgFmt, err := image.Decode(bytes.NewReader(thumbBytes)); err != nil {
+		perr("ERROR thumb url [%s] decode %v", thumbUrl, err)
 	} else {
-		dx, dy := photoImg.Bounds().Dx(), photoImg.Bounds().Dy()
+		dx, dy := thumbImg.Bounds().Dx(), thumbImg.Bounds().Dy()
 		if Config.DEBUG {
-			perr("DEBUG photo url [%s] fmt [%s] size <%dkb> res <%dx%d>", photourl, photoImgFmt, len(photoBytes)>>10, dx, dy)
+			perr("DEBUG thumb url [%s] fmt [%s] size <%dkb> res <%dx%d>", thumbUrl, thumbImgFmt, len(thumbBytes)>>10, dx, dy)
+		}
+		if thumbImgFmt == "webp" {
+			thumbPngBuf := new(bytes.Buffer)
+			png.Encode(thumbPngBuf, thumbImg)
+			thumbBytes = thumbPngBuf.Bytes()
+			if Config.DEBUG {
+				perr("DEBUG thumb url [%s] converted to fmt [png] size <%dkb>", thumbUrl, len(thumbBytes)>>10)
+			}
 		}
 	}
 
@@ -549,12 +558,12 @@ func tgpostpublished(ytvideo youtube.Video) error {
 		tg.Esc(tg.F("youtu.be/%s", ytvideo.Id))
 
 	if Config.DEBUG {
-		perr("DEBUG tgpostpublished msg "+NL+"%s", tgmsg)
+		perr("DEBUG tgpostpublished msg"+NL+"%s", tgmsg)
 	}
 
 	if _, err := tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
-		Photo:   photourl,
+		Photo:   thumbUrl,
 		Caption: tgmsg,
 	}); err != nil {
 		return fmt.Errorf("tg.SendPhoto %w", err)
@@ -568,7 +577,7 @@ func tgpostlive(ytvideo youtube.Video) error {
 
 	var photourl string
 	if ytvideo.Snippet.Thumbnails != nil {
-		photourl = ytvideoPhotoUrl(*ytvideo.Snippet.Thumbnails)
+		photourl = ytvideoThumbUrl(*ytvideo.Snippet.Thumbnails)
 	}
 
 	tgmsg := tg.Esc(TgLangMessages[Config.TgLang]["nextlive"]) + NL +
