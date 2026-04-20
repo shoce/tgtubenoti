@@ -1,17 +1,15 @@
 /*
-
 https://console.cloud.google.com/apis/credentials
 https://console.cloud.google.com/apis/api/youtube.googleapis.com/quotas
 # every search requests costs 100 quota
 # total quota limit is 10'000 per day
 # twice an hour schedule uses 4800 quota per day
 # trice an hour schedule uses 7200 quota per day
-
-GoGet GoFmt GoBuildNull
-
-https://github.com/shoce/tgtubenoti/actions
-
 */
+
+// GoGet GoFmt GoBuildNull
+
+// https://github.com/shoce/tgtubenoti/actions
 
 package main
 
@@ -39,7 +37,7 @@ import (
 
 	_ "golang.org/x/image/webp"
 
-	"github.com/shoce/tg"
+	tg "github.com/shoce/tg"
 )
 
 const (
@@ -581,12 +579,12 @@ func tgpostlive(ytvideo youtube.Video) error {
 	}
 
 	tgmsg := tg.Esc(TgLangMessages[Config.TgLang]["nextlive"]) + NL +
-		tg.Bold(Config.YtNextLiveTitle) + NL +
-		tg.Bold(tg.F("%s/%d %s",
+		tg.Bold(tg.Esc(Config.YtNextLiveTitle)) + NL +
+		tg.Bold(tg.Esc(tg.F("%s/%d %s",
 			strings.ToTitle(strings.Fields(TgLangMessages[Config.TgLang]["months"])[Config.YtNextLive.In(TgTimezone).Month()-1]),
 			Config.YtNextLive.In(TgTimezone).Day(),
 			Config.YtNextLive.In(TgTimezone).Format("15:04"),
-		)) + " " + tg.Esc(tg.F("(%s)", Config.TgTimezoneNameShort)) + NL +
+		))) + " " + tg.Esc(tg.F("(%s)", Config.TgTimezoneNameShort)) + NL +
 		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId))
 
 	if Config.DEBUG {
@@ -646,17 +644,14 @@ func downloadFile(url string) ([]byte, error) {
 	return bb.Bytes(), nil
 }
 
-func ts() string {
+func perr(msg string, args ...interface{}) {
 	tnow := time.Now().In(time.FixedZone("IST", 330*60))
-	return fmt.Sprintf(
+	ts := fmt.Sprintf(
 		"%d%02d%02d:%02d%02dॐ",
 		tnow.Year()%1000, tnow.Month(), tnow.Day(),
 		tnow.Hour(), tnow.Minute(),
 	)
-}
-
-func perr(msg string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, ts()+SP+msg+NL, args...)
+	fmt.Fprintf(os.Stderr, "<"+ts+">"+SP+msg+NL, args...)
 }
 
 func tglog(msg string, args ...interface{}) (err error) {

@@ -1,53 +1,53 @@
 # https://github.com/bsord/helm-push
 # https://docs.github.com/en/actions/learn-github-actions/contexts
 
-name: helm
+name: "helm"
 
 permissions:
-  contents: write
-  packages: write
+  contents: "write"
+  packages: "write"
 
 on:
   push:
     branches:
-      - main
+      - "main"
     paths:
-      - 'helm/**'
-      - '.github/workflows/helm.yaml'
+      - "helm/**"
+      - ".github/workflows/helm.yaml"
 
 jobs:
   build-push:
-    runs-on: ubuntu-latest
+    runs-on: "ubuntu-24.04"
     steps:
 
-      - uses: shoce/action-version@v1
+      - uses: "shoce/action-version@v1"
 
-      - uses: actions/checkout@v4
+      - uses: "shoce/action-checkout@v1"
 
-      - name: chart version
+      - name: "chart version"
         run: |
           sed -i -e "s/__VERSION__/$VERSION/g" helm/Chart.yaml
           cat helm/Chart.yaml
           HELM_CHART_NAME=$( yq .name helm/Chart.yaml )
           echo "HELM_CHART_NAME=$HELM_CHART_NAME" >> $GITHUB_ENV
 
-      - uses: bsord/helm-push@v4
+      - uses: "bsord/helm-push@v4"
         with:
           useOCIRegistry: true
-          registry-url:  oci://ghcr.io/${{ github.repository }}
-          username: ${{ github.repository_owner }}
-          access-token: ${{ secrets.GITHUB_TOKEN }}
+          registry-url:  "oci://ghcr.io/${{ github.repository }}"
+          username: "${{ github.repository_owner }}"
+          access-token: "${{ secrets.GITHUB_TOKEN }}"
           force: true
-          chart-folder: helm
+          chart-folder: "helm"
 
-      - uses: shoce/action-git-tag@v1
+      - uses: "shoce/action-git-tag@v1"
         env:
-          VERSION: helm-${{ env.VERSION }}
+          VERSION: "helm-${{ env.VERSION }}"
 
-      - uses: actions/delete-package-versions@v5
+      - uses: "actions/delete-package-versions@v5"
         with:
-          package-name: ${{ github.event.repository.name }}/${{ env.HELM_CHART_NAME }}
-          package-type: container
+          package-name: "${{ github.event.repository.name }}/${{ env.HELM_CHART_NAME }}"
+          package-type: "container"
           min-versions-to-keep: 4
           delete-only-untagged-versions: "false"
 
