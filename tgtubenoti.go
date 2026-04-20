@@ -591,7 +591,7 @@ func tgpostlivereminder() error {
 	var err error
 
 	tgmsg := tg.Esc(TgLangMessages[Config.TgLang]["livereminder"]) + NL +
-		tg.Bold(Config.YtNextLiveTitle) + NL +
+		tg.Bold(tg.Esc(Config.YtNextLiveTitle)) + NL +
 		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId))
 
 	perr("DEBUG tgpostlivereminder msg" + NL + tgmsg)
