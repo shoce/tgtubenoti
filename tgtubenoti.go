@@ -82,6 +82,8 @@ type TgTubeNotiConfig struct {
 }
 
 var (
+	F = fmt.Sprintf
+
 	Config TgTubeNotiConfig
 
 	HttpClient = &http.Client{}
@@ -163,6 +165,7 @@ func init() {
 	if Config.DEBUG {
 		perr("DEBUG <true>")
 		tg.DEBUG = true
+		perr("tg.DEBUG <true>")
 	}
 
 	perr("Interval <%v>", Config.Interval)
@@ -186,7 +189,7 @@ func init() {
 		perr("ERROR TgLang [%s] not supported")
 		os.Exit(1)
 	}
-	perr("DEBUG TgLang %s", Config.TgLang)
+	perr("DEBUG TgLang [%s]", Config.TgLang)
 
 	if Config.TgTimezoneName == "" {
 		perr("ERROR TgTimezoneName empty")
@@ -197,7 +200,7 @@ func init() {
 		tglog("ERROR time.LoadLocation [%s] %v", Config.TgTimezoneName, err)
 		os.Exit(1)
 	}
-	perr("DEBUG TgTimezoneName %s", Config.TgTimezoneName)
+	perr("DEBUG TgTimezoneName [%s]", Config.TgTimezoneName)
 
 	Config.TgTimezoneNameShort = Config.TgTimezoneName
 	Config.TgTimezoneNameShort = strings.ToLower(Config.TgTimezoneNameShort)
@@ -205,7 +208,7 @@ func init() {
 	if i := strings.LastIndex(Config.TgTimezoneNameShort, "/"); i >= 0 && len(Config.TgTimezoneNameShort) > i+1 {
 		Config.TgTimezoneNameShort = Config.TgTimezoneNameShort[i+1:]
 	}
-	perr("DEBUG TgTimezoneNameShort %s", Config.TgTimezoneNameShort)
+	perr("DEBUG TgTimezoneNameShort [%s]", Config.TgTimezoneNameShort)
 
 	if Config.TgChatId == "" {
 		perr("ERROR TgChatId empty")
@@ -269,10 +272,8 @@ func main() {
 }
 
 func CheckTube() (err error) {
-	if Config.DEBUG {
-		if !Config.YtNextLiveReminderSent && time.Now().Before(Config.YtNextLive) {
-			perr("DEBUG next live %s `%s` in %s", Config.YtNextLiveId, Config.YtNextLiveTitle, Config.YtNextLive.Sub(time.Now()).Truncate(time.Minute))
-		}
+	if !Config.YtNextLiveReminderSent && time.Now().Before(Config.YtNextLive) {
+		perr("DEBUG next live [%s] [%s] in <%s>", Config.YtNextLiveId, Config.YtNextLiveTitle, Config.YtNextLive.Sub(time.Now()).Truncate(time.Minute))
 	}
 
 	if tonextlive := Config.YtNextLive.Sub(time.Now()); tonextlive > 56*time.Minute && tonextlive < 62*time.Minute {
@@ -293,9 +294,7 @@ func CheckTube() (err error) {
 	// wait for YtCheckIntervalDuration
 
 	if time.Now().Sub(Config.YtCheckLast) < Config.YtCheckInterval {
-		if Config.DEBUG {
-			perr("DEBUG next youtube check in %v", Config.YtCheckLast.Add(Config.YtCheckInterval).Sub(time.Now()).Truncate(time.Second))
-		}
+		perr("DEBUG next youtube check in <%s>", Config.YtCheckLast.Add(Config.YtCheckInterval).Sub(time.Now()).Truncate(time.Second))
 		return nil
 	}
 
@@ -323,10 +322,8 @@ func CheckTube() (err error) {
 		return fmt.Errorf("YtPlaylistId empty")
 	}
 
-	if Config.DEBUG {
-		perr("DEBUG channel id %s", Config.YtChannelId)
-		perr("DEBUG playlist id %s", Config.YtPlaylistId)
-	}
+	perr("DEBUG channel id [%s]", Config.YtChannelId)
+	perr("DEBUG playlist id [%s]", Config.YtPlaylistId)
 
 	// https://pkg.go.dev/google.golang.org/api/youtube/v3#PlaylistItemSnippet
 	var ytvideosids []string
@@ -343,13 +340,11 @@ func CheckTube() (err error) {
 		}
 	}
 
-	if Config.DEBUG {
-		for j, v := range ytvideos {
-			perr(
-				"DEBUG %d/%d %s youtu.be/%s %s liveStreamingDetails %+v",
-				j+1, len(ytvideos), v.Snippet.Title, v.Id, v.Snippet.PublishedAt, v.LiveStreamingDetails,
-			)
-		}
+	for j, v := range ytvideos {
+		perr(
+			"DEBUG <%d/%d> [%s] [youtu.be/%s] [%s] liveStreamingDetails %+v",
+			j+1, len(ytvideos), v.Snippet.Title, v.Id, v.Snippet.PublishedAt, v.LiveStreamingDetails,
+		)
 	}
 
 	for _, v := range ytvideos {
@@ -492,9 +487,7 @@ func ytvideoslist(ytvideosids []string) (ytvideos []youtube.Video, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("videos list: %w", err)
 	}
-	if Config.DEBUG {
-		perr("DEBUG videos.list response: %+v", rv)
-	}
+	perr("DEBUG videos.list response %+v", rv)
 
 	for _, v := range rv.Items {
 		ytvideos = append(ytvideos, *v)
@@ -538,16 +531,12 @@ func tgpostpublished(ytvideo youtube.Video) error {
 		perr("ERROR thumb url [%s] decode %v", thumbUrl, err)
 	} else {
 		dx, dy := thumbImg.Bounds().Dx(), thumbImg.Bounds().Dy()
-		if Config.DEBUG {
-			perr("DEBUG thumb url [%s] fmt [%s] size <%dkb> res <%dx%d>", thumbUrl, thumbImgFmt, len(thumbBytes)>>10, dx, dy)
-		}
+		perr("DEBUG thumb url [%s] fmt [%s] size <%dkb> res <%dx%d>", thumbUrl, thumbImgFmt, len(thumbBytes)>>10, dx, dy)
 		if thumbImgFmt == "webp" {
 			thumbPngBuf := new(bytes.Buffer)
 			png.Encode(thumbPngBuf, thumbImg)
 			thumbBytes = thumbPngBuf.Bytes()
-			if Config.DEBUG {
-				perr("DEBUG thumb url [%s] converted to fmt [png] size <%dkb>", thumbUrl, len(thumbBytes)>>10)
-			}
+			perr("DEBUG thumb url [%s] converted to fmt [png] size <%dkb>", thumbUrl, len(thumbBytes)>>10)
 		}
 	}
 
@@ -555,9 +544,7 @@ func tgpostpublished(ytvideo youtube.Video) error {
 		tg.Bold(tg.Esc(ytvideo.Snippet.Title)) + NL +
 		tg.Esc(tg.F("youtu.be/%s", ytvideo.Id))
 
-	if Config.DEBUG {
-		perr("DEBUG tgpostpublished msg"+NL+"%s", tgmsg)
-	}
+	perr("DEBUG tgpostpublished msg" + NL + tgmsg)
 
 	if _, err := tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
@@ -587,9 +574,7 @@ func tgpostlive(ytvideo youtube.Video) error {
 		))) + " " + tg.Esc(tg.F("(%s)", Config.TgTimezoneNameShort)) + NL +
 		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId))
 
-	if Config.DEBUG {
-		perr("DEBUG tgpostlive msg "+NL+"%s", tgmsg)
-	}
+	perr("DEBUG tgpostlive msg" + NL + tgmsg)
 
 	if _, err = tg.SendPhoto(tg.SendPhotoRequest{
 		ChatId:  Config.TgChatId,
@@ -609,9 +594,7 @@ func tgpostlivereminder() error {
 		tg.Bold(Config.YtNextLiveTitle) + NL +
 		tg.Esc(tg.F("youtu.be/%s", Config.YtNextLiveId))
 
-	if Config.DEBUG {
-		perr("DEBUG tgpostlivereminder msg "+NL+"%s", tgmsg)
-	}
+	perr("DEBUG tgpostlivereminder msg" + NL + tgmsg)
 
 	msg, err := tg.SendMessage(tg.SendMessageRequest{
 		ChatId: Config.TgChatId,
@@ -645,13 +628,20 @@ func downloadFile(url string) ([]byte, error) {
 }
 
 func perr(msg string, args ...interface{}) {
+	if strings.HasPrefix(msg, "DEBUG ") && !Config.DEBUG {
+		return
+	}
 	tnow := time.Now().In(time.FixedZone("IST", 330*60))
 	ts := fmt.Sprintf(
 		"%d%02d%02d:%02d%02dॐ",
 		tnow.Year()%1000, tnow.Month(), tnow.Day(),
 		tnow.Hour(), tnow.Minute(),
 	)
-	fmt.Fprintf(os.Stderr, "<"+ts+">"+SP+msg+NL, args...)
+	msgtext := msg
+	if len(args) > 0 {
+		msgtext = F(msg, args...)
+	}
+	fmt.Fprint(os.Stderr, "<"+ts+">"+SP+msgtext+NL)
 }
 
 func tglog(msg string, args ...interface{}) (err error) {
@@ -689,17 +679,13 @@ func (cfg *TgTubeNotiConfig) Get() error {
 		return err
 	}
 
-	if cfg.DEBUG {
-		perr("DEBUG Config.Get %+v", cfg)
-	}
+	perr("DEBUG Config.Get %+v", cfg)
 
 	return nil
 }
 
 func (cfg *TgTubeNotiConfig) Put() error {
-	if cfg.DEBUG {
-		perr("DEBUG Config.Put %s %+v", cfg.YssUrl, cfg)
-	}
+	perr("DEBUG Config.Put [%s] %+v", cfg.YssUrl, cfg)
 
 	rbb, err := yaml.Marshal(cfg)
 	if err != nil {
