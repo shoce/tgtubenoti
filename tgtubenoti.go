@@ -263,7 +263,7 @@ func main() {
 
 		if dur := Config.Interval - time.Now().Sub(t0); dur > time.Second {
 			if Config.DEBUG {
-				perr("sleep %v", dur.Truncate(time.Second))
+				perr("sleep <%s>", dur.Truncate(time.Second))
 			}
 			time.Sleep(dur)
 		}
