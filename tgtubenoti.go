@@ -424,10 +424,11 @@ func CheckTube() (err error) {
 				perr("ERROR Config.Put %s", err)
 			}
 
-			perr("DEBUG next youtube check in <%s>", Config.YtCheckLast.Add(Config.YtCheckInterval).Sub(time.Now()).Truncate(time.Second))
 		}
 
 	}
+
+	perr("DEBUG next youtube check in <%s>", Config.YtCheckLast.Add(Config.YtCheckInterval).Sub(time.Now()).Truncate(time.Second))
 
 	return nil
 }
