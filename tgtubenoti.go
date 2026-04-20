@@ -174,6 +174,12 @@ func init() {
 		os.Exit(1)
 	}
 
+	perr("YtCheckInterval <%v>", Config.YtCheckInterval)
+	if Config.YtCheckInterval == 0 {
+		perr("ERROR YtCheckInterval empty")
+		os.Exit(1)
+	}
+
 	if Config.TgToken == "" {
 		perr("ERROR TgToken empty")
 		os.Exit(1)
@@ -417,6 +423,8 @@ func CheckTube() (err error) {
 			if err != nil {
 				perr("ERROR Config.Put %s", err)
 			}
+
+			perr("DEBUG next youtube check in <%s>", Config.YtCheckLast.Add(Config.YtCheckInterval).Sub(time.Now()).Truncate(time.Second))
 		}
 
 	}
